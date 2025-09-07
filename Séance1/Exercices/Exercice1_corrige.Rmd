@@ -1,0 +1,548 @@
+---
+title: "Séance 1 : Exercices (corrigés)"
+author: "Cécile Armand"
+date: "2025-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(FactoMineR)
+library(forcats)
+library(tidyverse)
+```
+
+# QCM 
+
+Testez vos connaissances en répondant à ce [questionnaire](https://forms.gle/E9eQhkTDDL8PJ8fFA ). 
+
+Consulter les [réponses](https://docs.google.com/forms/d/e/1FAIpQLSfzknUUQDMMuChwtimRtfRw-AUeUSJc0foqLECyUkuQ6E7sKA/viewform?usp=pp_url&entry.1842912509=Sauvegarder+du+code&entry.1693510977=Importer+des+donn%C3%A9es&entry.1693510977=Stocker+des+r%C3%A9sultats&entry.262002855=...permet+de+garder+une+trace+du+code.&entry.262002855=...peut+%C3%AAtre+enregistr%C3%A9+au+format+.R.&entry.965041892=tibble&entry.373239538=dplyr&entry.373239538=tidyverse&entry.669286764=filter()&entry.1899285758=filter()&entry.837987928=drop_na()&entry.837987928=na.omit()&entry.2082415245=analyse+de+correspondance&entry.2082415245=sankey&entry.1431329202=??nom_de_la_function). 
+
+# Main à la pâte 
+
+Le petit exercice qui suit a pour objectif de vous exercer à utiliser les fonctions introduites pendant la première séance, à partir d'un autre jeu de données similaire à celui utilisé pendant le cours. 
+
+Le jeu de données proposé se base sur un annuaire d'étudiants chinois aux Etats-Unis paru en 1917 (*Who's Who of American returned students*), accessible en full text sur [Wikisource](https://zh.wikisource.org/wiki/Page:Who%27s_who_of_American_returned_students_%3D_(You_Mei_tong_xue_lu_-_min_gou_liu_nian)_(IA_whoswhoofamerica00qing).pdf/5). Il contient plus de 400 étudiants avec des informations sur leurs origines, leur parcours d'éducation, leur carrière et d'autres informations biographiques (participation à des clubs, publications, récompenses, etc). Les données ont été extraites automatiquement en utilisant différentes techniques de traitement automatique des langues (TAL) puis nettoyées manuellement. 
+
+## Chargez le fichier 
+
+Chargez le fichier *youmei.csv*. 
+
+```{r warning = FALSE, message = FALSE}
+
+library(readr)
+youmei <- read_csv("~/RClass/Cours1/youmei.csv", col_types = cols(...1 = col_skip()))
+
+```
+
+## Inspectez les données
+
+
+  1. Combien y a-t-il d'observations ? Combien de variables ? 
+  2. Lister les 10 premiers étudiants. 
+  3. Lister toutes les variables. Combien y a-t-il de variables numériques ? 
+  4. Certaines variables contiennent-elles des données manquantes ? Lesquelles ? 
+  5. Lister les étudiants pour lesquelles les informations sont complètes.
+  
+```{r warning = FALSE, message = FALSE}
+
+# Réponse 1 : 401 observations (étudiants) et 38 variables
+
+# Réponse 2 
+
+head(youmei, n = 10)
+
+# Réponse 3
+
+names(youmei)
+summary(youmei) # 15
+
+# Réponse 4
+
+colSums(is.na(youmei))
+
+# Réponse 5 
+
+youmei[complete.cases(youmei), ] # un seul cas : imh-11-103
+
+
+```
+
+
+## Rationaliser
+
+Le jeu de données contient beaucoup de colonnes. Simplifiez-le de manière à éliminer les informations redondantes et conserver les informations les plus complètes. Conservez uniquement les colonnes suivantes, dans l'ordre indiqué, et renommez-les de manière claire, comme proposé dans le tableau ci-dessous. Veillez à ne pas écraser le jeu de données d'origine.   
+
+<br>
+
+<style type="text/css">
+.tg  {border-collapse:collapse;border-color:#93a1a1;border-spacing:0;}
+.tg td{background-color:#fdf6e3;border-color:#93a1a1;border-style:solid;border-width:0px;color:#002b36;
+  font-family:Arial, sans-serif;font-size:14px;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{background-color:#657b83;border-color:#93a1a1;border-style:solid;border-width:0px;color:#fdf6e3;
+  font-family:Arial, sans-serif;font-size:14px;font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-q6a5{border-color:inherit;font-size:10px;font-weight:bold;text-align:center;vertical-align:bottom}
+.tg .tg-qc7k{border-color:inherit;font-size:10px;text-align:left;vertical-align:bottom}
+.tg .tg-5221{font-size:10px;text-align:left;vertical-align:bottom}
+</style>
+<table class="tg" style="undefined;table-layout: fixed; width: 371px"><colgroup>
+<col style="width: 49.375px">
+<col style="width: 162.375px">
+<col style="width: 159.375px">
+</colgroup>
+<thead>
+  <tr>
+    <th class="tg-q6a5">Ordre</th>
+    <th class="tg-q6a5">Nom d’origine</th>
+    <th class="tg-q6a5">Nom après renommage</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td class="tg-qc7k">1</td>
+    <td class="tg-qc7k">DocId</td>
+    <td class="tg-qc7k">identifiant_source</td>
+  </tr>
+  <tr>
+    <td class="tg-qc7k">2</td>
+    <td class="tg-qc7k">FullName_py</td>
+    <td class="tg-qc7k">nom</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">3</td>
+    <td class="tg-5221">gender</td>
+    <td class="tg-5221">genre</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">4</td>
+    <td class="tg-5221">birth_year</td>
+    <td class="tg-5221">annee_naissance</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">5</td>
+    <td class="tg-5221">Birth_Province_eng_standard</td>
+    <td class="tg-5221">province_naissance</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">6</td>
+    <td class="tg-5221">Birth_Location_eng_standard</td>
+    <td class="tg-5221">ville_naissance</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">7</td>
+    <td class="tg-5221">Funding</td>
+    <td class="tg-5221">financement</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">8</td>
+    <td class="tg-5221">field_group</td>
+    <td class="tg-5221">discipline</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">9</td>
+    <td class="tg-5221">estimated_arrived_year</td>
+    <td class="tg-5221">annee_arrivee_USA</td>
+  </tr>
+  <tr>
+    <td class="tg-5221">10</td>
+    <td class="tg-5221">estimated_returned_year</td>
+    <td class="tg-5221">annee_retour_Chine</td>
+  </tr>
+</tbody></table>
+
+
+<br>
+
+
+```{r warning = FALSE, message = FALSE}
+
+
+youmei_clean <- youmei %>% select(DocId, FullName_py, gender, 
+                                  birth_year, Birth_Province_eng_standard, Birth_Location_eng_standard, 
+                                  Funding, field_group, 
+                                  estimated_arrived_year, estimated_returned_year) %>% 
+  rename(
+    identifiant_source = DocId,
+    nom               = FullName_py,
+    genre             = gender,
+    annee_naissance   = birth_year,
+    province_naissance= Birth_Province_eng_standard,
+    ville_naissance   = Birth_Location_eng_standard,
+    financement= Funding,
+    discipline     = field_group,
+    annee_arrivee_USA = estimated_arrived_year,
+    annee_retour_Chine= estimated_returned_year)
+
+```
+
+
+## Explorez les données 
+
+  1. Combien y a-t-il désormais d'individus avec des données complètes ?  
+  2. Combien y a-t-il d'étudiantes ? Quel pourcentage de la population totale représentent-elles (arrondir à 1 décimale) ? 
+  3. Identifier l'individu le plus âgé/le plus jeune et spécifier leur année de naissance. 
+  4. Visualiser la distribution des années de naissance sous forme d'histogramme. 
+  5. Analyser la distribution des étudiants selon leur province de naissance (en nombre et pourcentage)
+  6. Combien y a-t-il d'étudiants boursiers vs. auto-financés ? (Créer un nouvelle variable pour réduire à deux catégories)
+  7. Comment se répartissent les étudiants par discipline ?
+  8. Comparer le domaine d'étude selon le genre. 
+  9. Calculer la durée moyenne des études. 
+  10. Calculer l'âge au départ et au retour (créer un nouvelle variable à chaque fois).
+
+```{r warning = FALSE, message = FALSE, echo = FALSE, eval = FALSE}
+
+# 1. Combien y a-t-il désormais d'individus avec des données complètes ? 
+
+youmei_clean[complete.cases(youmei_clean), ] # 355
+
+```
+
+
+```{r warning = FALSE, message = FALSE}
+
+# 2. Combien y a-t-il d'étudiantes ?  # 18, 4.5%
+
+youmei_clean %>% group_by(genre) %>% count() %>% mutate(percent = round(n/401*100, 1))
+
+```
+  
+
+```{r warning = FALSE, message = FALSE}
+
+# 3. Identifier l'individu le plus âgé/le plus jeune et spécifier leur année de naissance. 
+
+# Identifier d'abord les années 
+
+min(youmei_clean$annee_naissance, na.rm = T) # le plus âgé (1851)
+max(youmei_clean$annee_naissance, na.rm = T)  # le plus jeune (1895) 
+
+# Identifier les individus correspondants 
+
+# Le plus âgé (année de naissance la plus petite)
+youmei_clean[which.min(youmei_clean$annee_naissance), ] # Liang Dunyan (1851)
+
+# Le plus jeune (année de naissance la plus grande)
+youmei_clean[which.max(youmei_clean$annee_naissance), ] # Tang Ruihua (1895)
+
+# Alternative avec dplyr 
+
+# Le plus âgé
+youmei_clean %>% 
+  slice_min(order_by = annee_naissance, n = 1)
+
+# Le plus jeune 
+youmei_clean %>% 
+  slice_max(order_by = annee_naissance, n = 1)
+
+
+```  
+
+```{r warning = FALSE, message = FALSE}
+
+# 4. Visualiser la distribution des années de naissance sous forme d'histogramme. 
+
+# Avec base R 
+
+hist(youmei_clean$annee_naissance,
+     main = "Distribution des années de naissance",
+     xlab = "Année de naissance",
+     ylab = "Fréquence",
+     col = "lightblue",
+     border = "white")
+
+
+# Avec ggplot 
+
+library(ggplot2)
+
+ggplot(youmei_clean, aes(x = annee_naissance)) +
+  geom_histogram(binwidth = 1, 
+                 fill = "steelblue", 
+                 color = "white") +
+  labs(title = "Distribution des années de naissance",
+       x = "Année de naissance",
+       y = "Effectif") +
+  theme_minimal()
+
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# 5. Calculer la distribution des étudiants selon leur province de naissance. 
+
+youmei_clean %>% group_by(province_naissance) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/401*100, 2))
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# 6. Combien y a-t-il d'étudiants boursiers vs. auto-financés ? 
+
+youmei_clean %>% group_by(financement) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/401*100, 2))
+
+# Regrouper en deux catégories 
+
+# Option 1 (avec ifelse)
+
+youmei_clean$financement2 <- ifelse(youmei_clean$financement == "Government support",
+                                    "Public", "Privé")
+
+
+# Option 2 (avec case.when)
+
+library(dplyr)
+
+youmei_clean <- youmei_clean %>%
+  mutate(financement2 = case_when(
+    financement == "Government support" ~ "Public",
+    financement %in% c("Private support", "Partial support", "Unknown") ~ "Privé",
+    TRUE ~ NA_character_
+  )) %>% 
+  relocate(financement2, .after = financement)
+
+
+
+# Option 3 (avec forcats)
+
+library(dplyr)
+library(forcats)
+
+youmei_clean <- youmei_clean %>%
+  mutate(financement2 = fct_recode(as.factor(financement),
+                                   "Public" = "Government support",
+                                   "Privé"  = "Private support",
+                                   "Privé"  = "Partial support",
+                                   "Privé"  = "Unknown")) %>% 
+  relocate(financement2, .after = financement)
+
+
+# Vérifier le résultat 
+
+table(youmei_clean$financement2)
+count(youmei_clean, financement2)
+prop.table(table(youmei_clean$financement2)) * 100
+
+
+```
+
+  
+```{r warning = FALSE, message = FALSE}
+
+# 7. Comment se répartissent les étudiants par discipline ?
+
+youmei_clean %>% group_by(discipline) %>% count(sort = TRUE) %>% mutate(percent = round(n/401*100, 2))
+
+```
+  
+  
+  
+```{r warning = FALSE, message = FALSE}
+
+# 8. Comparer le domaine d'étude selon le genre. 
+
+youmei_clean %>% group_by(genre, discipline) %>% count(sort = TRUE)
+
+```
+
+  
+```{r warning = FALSE, message = FALSE}
+
+# 9. Calculer la durée moyenne des études. 
+
+youmei_clean <- youmei_clean %>% mutate(duree = annee_retour_Chine - annee_arrivee_USA)
+
+mean(youmei_clean$duree, na.rm = T)
+
+# Option 1 (fonctions de base)
+
+min(youmei_clean$duree, na.rm = TRUE)   # durée minimum
+max(youmei_clean$duree, na.rm = TRUE)   # durée maximum
+mean(youmei_clean$duree, na.rm = TRUE)  # moyenne
+sd(youmei_clean$duree, na.rm = TRUE)    # écart-type
+
+# Option 2 (summary)
+
+summary(youmei_clean$duree)
+
+# Option 3 (summarize)
+
+library(dplyr)
+
+youmei_clean %>%
+  summarise(
+    min_duree = min(duree, na.rm = TRUE),
+    max_duree = max(duree, na.rm = TRUE),
+    moy_duree = mean(duree, na.rm = TRUE),
+    sd_duree  = sd(duree, na.rm = TRUE)
+  )
+
+
+```
+  
+```{r warning = FALSE, message = FALSE}
+
+# 10. Calculer l'âge au départ et au retour (créer un nouvelle variable à chaque fois).
+
+youmei_clean <- youmei_clean %>% mutate(age_arrivee = annee_arrivee_USA - annee_naissance, 
+                                        age_retour = annee_retour_Chine - annee_naissance)
+
+```
+
+
+## Pour aller plus loin 
+
+  1. L'origine géographique conditionne-t-elle l'obtention d'une bourse ? 
+  2. Le financement a-t-il une influence sur le choix de la discipline ? 
+  3. La durée des études dépend-elle de la discipline ? 
+  4. La durée des études évolue-t-elle au fil des générations ?
+
+**Indices** : 
+
+  * Pour (1) et (2), corréler les variables deux à deux en utilisant l'analyse de correspondance. 
+  * Pour (3) penser à utiliser nuage de points et diagrammes en boîte
+
+```{r warning = FALSE, message = FALSE}
+
+#   1. L'origine géographique conditionne-t-elle l'obtention d'une bourse ? 
+
+# Sélectionner les variables à croiser 
+
+youmei_province_funding <- youmei_clean %>%
+  drop_na(province_naissance, financement) %>%
+  group_by(province_naissance, financement) %>%
+  tally() %>%
+  pivot_wider(names_from = province_naissance, 
+              values_from = n, values_fill = 0)
+
+
+# on convertit la colonne des provinces en noms de lignes
+
+library(tidyverse)
+
+youmei_province_funding_ca <- column_to_rownames(youmei_province_funding, var = "financement") 
+
+# on applique l'analyse des correspondances
+
+library(FactoMineR)
+
+res.ca <- CA(youmei_province_funding_ca, graph = FALSE)
+
+plot.CA(res.ca, title="Province de naissance et financement", cex=0.7, cex.main=0.8, cex.axis=0.7)
+
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# 2. Le financement a-t-il une influence sur le choix de la discipline ? 
+
+# Sélectionner les variables à croiser 
+
+youmei_field_funding <- youmei_clean %>%
+  drop_na(discipline, financement) %>%
+  group_by(discipline, financement) %>%
+  tally() %>%
+  pivot_wider(names_from = discipline, 
+              values_from = n, values_fill = 0)
+
+
+# on convertit la colonne des provinces en noms de lignes
+
+library(tidyverse)
+
+youmei_field_funding_ca <- column_to_rownames(youmei_province_funding, var = "financement") 
+
+# on applique l'analyse des correspondances
+
+library(FactoMineR)
+
+res.ca2 <- CA(youmei_field_funding_ca, graph = FALSE)
+
+plot.CA(res.ca2, title="Discipline and Financement", cex=0.7, cex.main=0.8, cex.axis=0.7)
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# 3. La durée des études dépend-elle de la discipline ? 
+
+youmei_clean %>% 
+  filter(!is.na(duree)) %>%  
+    filter(!is.na(discipline)) %>% 
+  ggplot(aes(x= discipline, y = duree, fill = discipline)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Durée des études et discipline d'étude", 
+       x = NULL,
+       y = "Années",
+       fill = NULL) 
+
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# 4. La durée des études évolue-t-elle au fil des générations ? 
+
+# Option 1 : nuage de points croisant année d'arrivée (horizontal) et durée du séjour (vertical)
+
+youmei_clean %>%  
+  ggplot(aes(annee_arrivee_USA, duree)) +
+  geom_jitter(alpha = 0.7) + 
+  geom_smooth(method = "gam", se = TRUE, linewidth = 0.7) +
+  labs(title = "Durée des études au fil des cohortes",
+       x = "Année d'arrivée aux USA",
+       y = "Durée du séjour (années)")
+
+# Option 2 : créer une variable "génération" et comparer la durée des études à travers les groupes avec des boxplots
+
+youmei_clean <- youmei_clean %>%
+  mutate(
+    generation = case_when(
+      annee_arrivee_USA >= 1872 & annee_arrivee_USA <= 1904 ~ "1872-1904",
+      annee_arrivee_USA >= 1905 & annee_arrivee_USA <= 1911 ~ "1905-1911",
+      annee_arrivee_USA >= 1912 & annee_arrivee_USA <= 1917 ~ "1912-1917",
+      TRUE ~ NA_character_   # pour les valeurs hors bornes
+    )
+  )
+
+youmei_clean %>% 
+  filter(!is.na(duree)) %>%  
+  ggplot(aes(x= generation, y = duree, fill = generation)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  labs(title = "Durée des études selon les cohortes", 
+       x = NULL,
+       y = "Années",
+       fill = NULL) 
+
+# Autre périodisation 
+
+youmei_clean <- youmei_clean %>%
+  mutate(
+    generation2 = case_when(
+      annee_arrivee_USA >= 1872 & annee_arrivee_USA <= 1908 ~ "Pre-Boxer",
+      annee_arrivee_USA >= 1909 & annee_arrivee_USA <= 1917 ~ "Post-Boxer",
+      TRUE ~ NA_character_   # pour les valeurs hors bornes
+    )
+  )
+
+library(forcats)
+
+youmei_clean %>% 
+  filter(!is.na(duree)) %>%  
+  ggplot(aes(x = fct_rev((generation2)), # inverser l'ordre des variables pour faire apparaître la génération la plus ancienne (pre-Boxer) en premier
+             y = duree, 
+             fill = generation2)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  labs(title = "Durée des études selon les cohortes", 
+       x = NULL,
+       y = "Années",
+       fill = NULL) 
+
+
+```
+

@@ -1,0 +1,1472 @@
+---
+title: "Séance 1: Introduction à R pour les SHS"
+author: "Cécile Armand"
+date: "2025-10-01"
+abstract: |
+
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    number_sections: false
+    code_folding: show # hide
+    fig_caption: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(tidyr)
+library(tidyverse)
+library(FactoMineR)
+library(networkD3)
+library(htmlwidgets)
+
+```
+
+# 0. Introduction
+
+L'objectif général de cette première séance est de comprendre la logique du langage R et de se familiariser avec l'interface R Studio en apprenant à manipuler un jeu de données structuré de type dataframe. On apprendra en particulier à : 
+
+  - Manipuler un dataframe avec le package **dplyr**.
+  - Utiliser des fonctions statistiques de base pour explorer des données quantitatives et qualitatives.
+  - Gérer les données manquantes.
+  - Visualiser les données avec les packages **ggplot2** et **plotly** 
+  - Comparer différents types de visualisations et leur usages.  
+
+# 1. Préliminaires 
+## Installer R Studio
+## Se familiariser avec l’interface
+## Créer un projet
+## Charger / lire un fichier csv
+
+Le package **readr** sert à lire les fichiers importés en précisant si nécessaire les éléments de déliminations (virgules pour un fichier csv, etc).
+```{r warning = FALSE, message=FALSE}
+
+library(readr)
+auc <- read_delim("~/RClass/Data/auc.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+auc
+```
+<br>
+La fonction **View()** permet d'ouvrir le fichier dans une fenêtre à part. 
+```{r warning = FALSE, message=FALSE, eval = FALSE}
+View(auc)
+```
+<br>
+La fonction **head()** permet de visualiser les premières lignes dans la console:
+```{r warning = FALSE, message=FALSE}
+head(auc)
+```
+<br>
+Par défaut, les 6 premières lignes sont affichées, mais on peut augmenter ou diminuer en utilisant l'argument "n =": 
+```{r}
+head(auc, n = 2)
+head(auc, n = 10)
+```
+
+## Inspecter un dataframe 
+
+La fonction **class()** permet de connaître la nature du fichier importé: 
+```{r warning = FALSE, message=FALSE}
+
+class(auc)
+
+```
+<br>
+<div class="alert alert-success" role="alert"> 
+Les termes "spec_tbl_df", "tbl_df" et "tbl" sont des versions modernisées des data.frames traditionnels de base R (Voir la section Aide-mémoire) pour plus de détails).
+Pour convertir en dataframe simple, on peut utiliser la fonction **as.data.frame()**: 
+```{r warning = FALSE, message=FALSE, eval = FALSE}
+
+auc <- as.data.frame(auc)
+
+```
+</div>
+<br>
+La fonction **names()** permet de lister les variables : 
+```{r warning = FALSE, message=FALSE}
+
+names(auc)
+
+```
+<br>
+La fonction **summary()** fournit un résumé pour chaque colonne du tableau : 
+```{r warning = FALSE, message=FALSE}
+
+summary(auc)
+
+```
+<br>
+Explications : 
+
+  * **Length** renvoie au nombre d'observations (lignes).
+  * **Class** renseigne sur la nature des variables (caractères, numériques, logiques) (pour plus de détails, voir l'aide-mémoire).
+  * **Mode** mode de stockage (ne pas s'en occuper)
+  * **NAs** : valeurs manquantes.
+  * **Min, Max, Median...** : pour les variables numériques spécifiquement
+
+## Quizz
+
+1. Combien d'observations et de variables contient ce dataframe ? 
+2. A quoi correspondent les observations ? 
+3. Quelles informations (variables) sont disponibles sur les individus ? 
+3. En quelle année le plus ancien étudiant a-t-il été diplomé ? 
+4. Y a-t-il des données manquantes dans les variables de type "caractères" ? Lesquelles ? 
+
+
+<div class="alert alert-success" role="alert"> 
+Astuce: pour identifier les colonnes avec des données manquantes, on peut utiliser le code suivant : 
+```{r warning = FALSE, message=FALSE, eval = FALSE}
+
+colSums(is.na(auc))
+
+```
+</div>
+
+```{r message = FALSE, warning = FALSE, echo = FALSE, eval = FALSE}
+
+anyNA(auc) # Renvoie TRUE s’il y a au moins une valeur manquante dans le data.frame.
+is.na(auc) # Crée une matrice logique du même format que le data.frame, avec TRUE pour chaque cellule contenant NA. 
+
+# Par colonne 
+colSums(is.na(auc))
+
+# Par ligne 
+rowSums(is.na(auc))
+
+# Localiser précisément les lignes avec des NAs (extraire les lignes contenant au moins un NA)
+
+auc[!complete.cases(auc), ]
+auc[rowSums(is.na(auc)) > 0, ]
+
+# Extraire les lignes avec des données complètes
+
+auc[complete.cases(auc), ]
+
+```
+
+
+# 2. Manipuler un dataframe
+
+Charger le package **dplyr** (à installer au préalable si nécessaire)
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+install.packages("dplyr")
+library(dplyr)
+
+```
+
+## Sélectionner des variables : select()
+
+Ce jeu de données contient des colonnes redondantes, tâchons de faire le ménage. Nous allons en particulier : 
+
+  * conserver une seule colonne pour le nom; 
+  * retenir uniquement les variables suivantes, que nous allons utiliser dans la section exploratoire (3) : nationalité, université, nature du diplôme, discipline, année de début et de fin, employeur, secteur.
+
+Pour sélectionner les variables qui nous intéressent, on utilise la fonction **select()**: 
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc %>% select(Name_full, Nationality, 
+                             University, Degree_level, 
+                             Field_main, Field_2,
+                             Year_start, Year_end, 
+                             Employer_main, Sector_1)
+
+auc_simple
+
+```
+<div class="alert alert-success" role="alert"> 
+**Explications**:
+
+  * Eviter d'écraser les données source : il est toujours préférable de créer un nouveau dataframe, en lui donnant un nouveau nom, à gauche de la flèche (ici, "auc_simple")
+  * Le symbole **%>%** (appelé "pipe") sert à échaîner les opérations : ici, on applique la fonction **select()** au jeu de données d'origine (auc) pour produire un nouveau dataframe (auc_simple). 
+  * Bien respecter le nom de chaque variable exactement tel qu'il est donné dans le dataframe source.  
+  * L'ordre dans lequel les variables sont listées après **select()** sera reproduit dans le tableau final. Cette fonction peut donc être utilisée aussi pour réorganiser les colonnes.</div>
+  
+<br>
+Si la liste des variables à conserver est plus longue que celle des variables à éliminer, on peut procéder à l'inverse en "déselectionnant" les variables indésirables. 
+
+Par exemple, on décide finalement de ne garder qu'une seule variable pour la discipline en supprimant "Field_2" : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc_simple %>% select(-c(Field_2))
+
+auc_simple
+
+```
+
+
+## Renommer des variables : rename()
+
+On souhaite maintenant simplifier le nom des variables (ou les mettre en français, par exemple). La fonction **rename()** est conçue pour cela : 
+
+```{r message = FALSE, warning = FALSE, eval=FALSE}
+
+auc_simple <- auc_simple %>% rename(Name = Name_full)
+
+```
+<br>
+<div class="alert alert-danger" role="alert">
+**Important à retenir** 
+
+  * Dans le code, le nouveau nom de remplacement (Name) précède toujours l'ancien nom à remplacer (Name_full)
+  * Règles pour (re)nommer des variables : éviter les espaces blancs et les caractères spéciaux (accents, etc). Privilégier des noms courts mais aussi explicites que possible.</div> 
+  
+On peut renommer plusieurs variables en une seule fois, en les séparant par des virgules :
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc_simple %>% rename(Name = Name_full, Degree = Degree_level, Field = Field_main, 
+                                    Start = Year_start, End = Year_end,
+                                    Employer = Employer_main, Sector = Sector_1)
+
+auc_simple
+
+```
+
+<br>
+On y voit plus clair !
+
+## Créer de nouvelles variables : mutate()
+
+La fonction mutate() est couramment employée pour créer de nouveleles variables (colonnes).  
+
+Par exemple, on veut étudier la durée de formation des étudiants. Pour cela, nous allons calculer la différence entre la fin et le début de la formation et stocker cette information dans une nouvelle variable (Duration). Pour créer cette nouvelle variable, on utilise la **mutate()** et l'on indique ce que l'on veut mettre dedans après le "=" (soustraire l'année de début à l'année de fin) : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc_simple %>% mutate(Duration = End-Start)
+
+auc_simple
+
+```
+<br>
+Par défaut, la nouvelle variable est placée tout au bout du tableau. Si l'on veut la déplacer à proximité des variables d'origine, par exemple, après "End" et avant "Employer", on peut utiliser la fonction **relocate()**: 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc_simple %>% relocate(Duration, .after = "End")
+
+auc_simple <- auc_simple %>% relocate(Duration, .before = "Employer") # même résultat 
+
+auc_simple
+
+```
+
+<br> 
+<div class="alert alert-success" role="alert"> 
+Noter que dans le code, la colonne à déplacer (ici, *Duration*) précède toujours la colonne repère (*End* ou *Employer*). On retrouve la même logique que pour la création ou le renommage de colonnes avec **mutate** et **rename**.</div> 
+
+## Supprimer des variables 
+
+<div class="alert alert-danger" role="alert">
+A manipuler avec précaution !</div>
+
+Dans l'hypothèse on l'on ait besoin de supprimer une colonne, plusieurs options s'offrent à nous. Commençons par créer une variable "bidon" que l'on peut supprimer sans danger. Par exemple, dupliquons la colonne "Name": 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple <- auc_simple %>% mutate(Name2 = Name) %>% relocate(Name2, .after = Name)
+auc_simple
+
+```
+<br>
+### Option 1 avec base R
+
+```{r message = FALSE, warning = FALSE}
+auc_simple$Name2 <- NULL
+```
+<br>
+**Explication**
+
+  * Dans base R, l’opérateur `$` permet d’accéder à une colonne spécifique d’un dataframe (ou tibble) par son nom (ici, la colonne `Name2`)
+  * `NULL` est un objet spécial en R qui représente « rien » ou « vide » : lorsqu’on assigne NULL à une colonne d’un data.frame, cela a pour effet de supprimer complètement la colonne.
+
+### Option 2 avec select()
+
+Comme nous l'avons vu précédemment, on peut utiliser **select(-c())** pour déselectionner, et donc supprimer des colonnes : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+auc_simple2 <- auc_simple %>% select(-c(Name2)) 
+
+```
+<br>
+
+**Explication**
+
+  * `auc_simple2 <-`: on crée un nouveau dataframe `auc_simple2`pour éviter d'écraser l'ancien .
+  * `auc_simple %>% select` : on applique au dataframe `auc_simple` la fonction select() de manière négative pour déselectionner la colonne indésirable (Name2) 
+
+
+
+<div class="alert alert-success" role="alert">
+Remarque : 
+La deuxième méthode présente plusieurs avantages : 
+
+  * Elle permet de supprimer plusieurs colonnes en une seule fois, tandis que la méthode base R ne permet d'en supprimer qu'une seule à chaque fois. 
+  * Elle est plus conservatrice : en renommant le jeu de données `auc_simple2`, on évite d'écraser la colonne d'origine et l'on peut facilement la restaurer si besoin en retournant au jeu de données d'origine (`auc_simple`).</div>
+
+## Dédoublonner avec distinct() 
+
+Si l'on veut supprimer les doublons dans un dataframe, on peut utiliser la fonction **distinct()** fournie par le package `dplyr`. Par exemple, on peut l'utiliser pour obtenir la liste des étudiants ou des universités : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% distinct(Name) # liste des étudiants
+auc_simple %>% distinct(University) # liste des universités
+
+```
+
+<br>
+La fonction **distinct()** peut être appliquée sur une ou plusieurs colonnes, pour obtenir des combinaisons uniques des colonnes spécifiées. Par exemple, si l’on veut obtenir la liste des paires uniques étudiant-université ou des triplets étudiant-discipline-université : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% distinct(Name, University) # paires uniques
+auc_simple %>% distinct(Name, University, Field) # triplets unique 
+
+```
+
+<div class="alert alert-success" role="alert"> 
+**Note**: La fonction **distinct()**  peut être combinée avec d'autres fonctions de `dplyr`, par exemple **count()**, pour faire des comptages, comme on le verra dans la section suivante (3). Elle est utile également pour préparer une liste de liens (*edge list*) en vue d’une analyses de réseau, comme on le verra dans une prochaine séance. Plus généralement, la fonction **distinct()** est très utile pour  nettoyage ou simplifier ses données. </div>
+
+
+## Filtrer des valeurs : filter()
+
+Jusqu'ici on s'en est tenu à manipuler les colonnes ou les lignes sans vraiment considérer leur contenu. Dans la suite du script, nous allons plonger dans les données elles-mêmes. 
+
+La fonction **filter()** permet de sélectionner uniquement les observations (lignes) qui correspondent à un attribut spécifique. Par exemple, admettons que l'on s'intéresse uniquement aux étudiants chinois. On va faire appel à la fonction **filter()** pour sélectionner les individus qui correspondent à la caractéristique `Nationality = Chinese` : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% filter(Nationality == "Chinese")
+
+```
+
+<div class="alert alert-danger" role="alert">
+**Important à retenir**
+
+  * Le nom de la valeur à filtrer doit être écrite exactement telle qu'elle apparaît dans le tableau (par exemple, "chinese" sans majuscule produira un message d'erreur). 
+  * Noter l'usage du **double `==`** pour filtrer les valeurs et l'usage des **guillemets** (à la différence du simple `=` et l'absence de guillemets lorsqu'on manipule les colonnes avec les fonctions *select*, *mutate*, *rename*, *relocate*).</div>
+
+Créons un nouveau dataframe contenant uniquement la sous-population d'étudiants chinois : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_chinese <- auc_simple %>% filter(Nationality == "Chinese")
+
+```
+<br>
+Inversement, on peut utiliser **filter()** pour exclure des valeurs, par exemple, les Japonais. Deux méthodes sont possibles :  
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% filter(!Nationality == "Japanese")
+auc_simple %>% filter(Nationality != "Japanese") # même résultat 
+
+```
+<br>
+<div class="alert alert-danger" role="alert"> Noter que le double `==` devient simple quand on ajoute `!` juste devant, mais pas quand on ajoute `!` devant le nom de la variable à filtrer. </div>
+
+<div class="alert alert-success" role="alert"> 
+**Astuce** : on peut aussi utiliser la fonction **filter()** pour exlure les valeurs manquantes, comme dans l'exemple ci-dessous, pour éliminer les disciplines manquantes (Field) :
+```{r message = FALSE, warning = FALSE, eval=FALSE}
+
+auc_simple %>% filter(!is.na(Field))
+
+```
+</div> 
+
+On peut aussi filtrer des **variables numériques¨¨. Par exemple, sélectionnons les étudiants dont la formation a duré plus de 2 ans : 
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% filter(Duration > 2) # 3 ans et plus 
+auc_simple %>% filter(Duration >= 2) # 2 ans et plus 
+
+```
+<br> 
+Dans le cas des variables numériques, pas de besoin de guillemets. 
+
+## Quizz 
+
+  1. Combien y a-t-il d'étudiants japonais ?  
+  2. Combien d'individus ont étudié avant 1900 ? Jusqu'en 1914 ? Après 1918 ? (En se basant sur l'année de début)
+  3. Combien d'étudiants occidentaux ont étudié aux Etats-Unis entre 1914 et 1918 (inclus) ? 
+
+<div class="alert alert-success" role="alert"> 
+Astuce: utiliser la fonction **distinct()** pour sélectionner les individus uniques.</div> 
+
+```{r message = FALSE, warning = FALSE, echo=FALSE, eval = FALSE}
+
+# Question 1 
+auc_simple %>% filter(Nationality == "Japanese") %>% distinct(Name) # 4 
+
+# Question 2 
+auc_simple %>% filter(Start < 1900) %>% distinct(Name) # 15 
+auc_simple %>% filter(Start <= 1914) %>% distinct(Name) # 122 
+auc_simple %>% filter(Start > 1918) %>% distinct(Name) # 276 
+
+# Question 3
+auc_simple %>% filter(Start >= 1914) %>% filter(Start <= 1918) %>% distinct(Name) # 110
+
+```
+
+# 3. Explorer les données
+
+## Compter avec dplyr
+
+La fonction **count()** fournie par **dplyr** est très efficace pour effectuer différents comptages sur des données qualitatives. Sa force vient de ce qu’elle peut être combinée avec d’autres fonctions pour faire des comptages plus ou moins complexes.
+
+Par exemple si l’on veut compter combien il y a d’étudiants ou d'universités uniques, on peut combiner la fonction **count()** avec **distinct()**, introduite précédemment : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% distinct(Name) %>% count() # nombre d'étudiants
+auc_simple %>% distinct(University) %>% count() # nombre d'universités
+
+```
+<br>
+
+## Comptages groupés
+
+Avec **dplyr**, il est très facile de faire des comptages complexes croisant plusieurs variables. Pour cela, il suffit de combiner les fonctions **group_by()** et **count()**. On peut y ajouter l'argument **(sort = )** pour trier les valeurs à la sortie. 
+Par exemple, examinons la distribution des étudiants par discipline : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% group_by(Field) %>% count(sort = TRUE)
+
+```
+<br>
+La combinaison **group_by() %>% count()** est l'équivalent des **tableaux croisés dynamiques** obtenus avec un logiciel comme Excel, mais offre beaucoup plus de latitude dans le choix des variables à combiner. 
+
+Si le résultat contient beaucoup de valeurs, on peut les stocker dans une nouvelle variable : 
+
+```{r message = FALSE, warning = FALSE}
+
+field_count <- auc_simple %>% group_by(Field) %>% count()
+
+```
+<br>
+On peut également calculer le pourcentage que représente chaque discipline et le stocker dans une colonne : 
+
+```{r message = FALSE, warning = FALSE}
+
+field_count <- auc_simple %>% group_by(Field) %>% count() %>% mutate(percent = n/682)
+field_count <- auc_simple %>% group_by(Field) %>% count() %>% mutate(percent = n/682*100) 
+field_count <- auc_simple %>% group_by(Field) %>% count() %>% mutate(percent = n/682*100) 
+
+```
+<br>
+On peut enfin utiliser **group_by()** pour créer de nouvelles variables synthétiques, par exemple calculer la durée totale d'études de chaque étudiant : 
+
+```{r message = FALSE, warning = FALSE}
+
+summary_years <- auc_simple %>%
+  group_by(Name, Nationality) %>%
+  summarise(
+    study_start_year = min(Start, na.rm = TRUE),
+    study_end_year = max(End, na.rm = TRUE))
+
+summary_years <- summary_years %>% mutate(study_duration = study_end_year-study_start_year)
+
+summary_years 
+  
+```
+
+<br>
+**Explication**
+
+  * **group_by(Name, Nationality)** : on regroupe les lignes du tableau par combinaison de Name et Nationality. Autrement dit, toutes les observations relatives à un même étudiant et sa nationalité seront traitées ensemble.
+  * La fonction **summarise()** du package dplyr sert à réduire un tableau de données en un résumé, en appliquant des fonctions de calcul (agrégation) sur les groupes définis avec group_by(). Avant summarise(), on a plusieurs lignes par groupe (par exemple, toutes les observations d’un même étudiant). Après summarise(), on obtient une seule ligne par groupe, avec les valeurs calculées (minimum, maximum, moyenne, somme, etc.). Dans l'exemple ci-dessous, on calcule à l’intérieur de chaque groupe : l’année de début des études (study_start_year), c’est-à-dire la plus petite valeur de Start trouvée dans le groupe (min) ; l’année de fin des études, c’est-à-dire la plus grande valeur de End trouvée dans le groupe (max). 
+  * **na.rm = TRUE** permet d’ignorer les valeurs manquantes (NA).
+
+
+
+
+## Compter avec base R
+
+Base R reste très efficace pour des comptages simples sur les variables quantitatives. Par exemple, on peut facilement calculer la durée minimale, maximale et moyenne de la durée des formations : 
+
+```{r message = FALSE, warning = FALSE}
+
+summary(auc_simple$Duration) # au niveau de chaque formation
+summary(summary_years$study_duration) # au niveau de chaque individu
+
+min(summary_years$study_duration, na.rm = TRUE) # formation la plus courte
+max(summary_years$study_duration, na.rm = TRUE) # formation la plus longue
+mean(summary_years$study_duration, na.rm = TRUE) # durée moyenne de formation
+sd(summary_years$study_duration, na.rm = TRUE) # écart type
+
+```
+## Quizz 
+
+  1. Quelles sont les 5 universités les plus populaires ? 
+  2. Quelle proportion représentent les étudiants chinois dans l'ensemble de la population ?  
+  3. Combien d'ingénieurs chinois ont été formés aux Etats-Unis avant 1920 ? 
+  4. Quelle est la durée moyenne et maximale de la formation aux Etats-Unis chez les étudiants japonais ? 
+
+<div class="alert alert-success" role="alert"> 
+Astuce: utiliser la fonction **distinct()** pour sélectionner les individus uniques.</div> 
+
+```{r message = FALSE, warning = FALSE, echo=FALSE, eval = FALSE}
+
+# Question 1
+
+# En se basant sur le nombre de formations
+auc_simple %>% group_by(University) %>% count(sort = TRUE) 
+# En se basant sur le nombre de d'étudiants
+auc_simple %>% distinct(Name, University) %>% group_by(University) %>% count(sort = TRUE) 
+
+# Question 2
+
+# Comptons d'abord le nombre total d'étudiants 
+auc_simple %>% distinct(Name, Nationality) %>% count() # 418
+
+# Calculons ensuite le nombre total d'étudiants de chaque nationalité
+auc_simple %>% distinct(Name, Nationality) %>% 
+  group_by(Nationality) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = n/418*100) # calculons le pourcentage
+
+# Question 3
+
+auc_simple %>% filter(Field == "Engineering") %>% 
+  filter(Start<1920) %>% 
+  distinct(Name, Nationality) %>% 
+  group_by(Nationality) %>% count() 
+
+# alternative
+
+auc_simple %>% filter(Nationality == "Chinese") %>% 
+  filter(Start<1920) %>% 
+  distinct(Name, Field) %>% 
+  group_by(Field) %>% count()
+
+# Question 4 
+
+summary_years <- auc_simple %>%
+  group_by(Name, Nationality) %>%
+  summarise(
+    study_start_year = min(Start, na.rm = TRUE),
+    study_end_year = max(End, na.rm = TRUE)) %>% 
+  mutate(study_duration = study_end_year-study_start_year)
+
+jap <- summary_years %>% filter(Nationality == "Japanese")
+
+summary(jap$study_duration)
+
+
+```
+
+# 4. Visualiser
+
+Charger le package **ggplot2()** (l'installer au préalable si nécessaire)
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+install.packages("ggplot2")
+library(ggplot2)
+
+```
+
+## Histogramme
+
+Les histogrammes sont préconisés pour visualiser des fréquences ou une distribution au cours du temps (attention, s'applique uniquement sur des variables numériques)
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  ggplot(aes(x=Start)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "American University Men of China", 
+       subtitle = "Period of study", 
+       x = "Year",
+       y = "Number of curricula")
+
+```
+<br>
+
+**Explications**
+
+  * `auc_simple %>%` : On part du dataframe `auc_simple` qui contient nos données et on utilise un pipe pour lui appliquer la fonction ggplot()
+  * `ggplot(aes(x=Start))` : On apelle la fonction **ggplot()** fourni par le package `ggplot2` pour initialiser un graphique avec le jeu de données fourni. `aes(x=Start)` définit l’esthétique : ici, l’axe des **x** est la variable `Start` (l’année de début des études). À ce stade, rien n’est dessiné, on a juste défini le "contexte" du graphique.
+  * `geom_histogram(binwidth = 1)` :  on ajoute une couche géométrique (ici, un histogramme). `binwidth = 1` signifie que chaque "barre" de l’histogramme regroupe les observations par intervalles de 1 unité (ici, l'unité est l'année). 
+  * `labs(...)` : la fonction `labs()` sert à donner des étiquettes et des titres : `title = "American University Men of China"` (titre principal du graphique), `subtitle = "Period of study"` (sous-titre), `x = "Year"` (nom de l’axe horizontal), `y = "Number of curricula"` (nom de l’axe vertical).
+  
+
+On peut aussi distinguer différents groupes (par exemple, par nationalité) sur l'histogramme en utilisant l'argument **"fill"**: 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  ggplot(aes(x=Start, fill = Nationality)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "American University Men of China", 
+       subtitle = "Period of study", 
+       x = "Year",
+       y = "Number of curricula",
+       fill = "Nationality")
+
+```
+
+## Barplot
+
+Pour visualiser la distribution de **variables catégorielles** (par exemple, Nationalité, Discipline, Université), on utilise très souvent un **diagramme en barres** (geom_bar) : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  distinct(Name, Nationality) %>%
+  group_by(Nationality) %>%
+  count() %>%
+  ggplot(aes(x = Nationality, y = n, fill = Nationality)) +
+  geom_bar(stat = "identity") 
+```
+<br>
+
+**Explications**
+
+  * `auc_simple %>%` : on part du même dataframe `auc_simple` mais cette fois on va regrouper les données selon la variable `Nationality`.  
+  * `distinct(Name, Nationality)` : cette ligne élimine les doublons, comme vu précédemment. Si un même étudiant (`Name`) apparaît plusieurs fois, il ne sera gardé qu’une seule fois par nationalité. Résultat : on évite de surcompter les étudiants.
+  * `group_by(Nationality) %>% count()` : après `group_by`, la fonction `count()` calcule le nombre d’observations dans chaque groupe (nombre d'étudiants de chaque nationalité). Le résultat est une table avec deux colonnes : `Nationality` et `n` (le nombre de cas dans ce groupe).
+  * `ggplot(aes(x = Nationality, y = n, fill = Nationality))` : on indique à **ggplot** que l'axe horizontal (x) correspond aux nationalités, l'axe vertical (y) représente le nombre d'individus dans chaque nationalité (n) calculé précédemment, et qu'on veut colorier les barres selon la nationalité, pour mieux distinguer visuellement les catégories.
+  * `geom_bar(stat = "identity")` : on indique à R de ne pas recalculer les effectifs (contrairement à un barplot "classique"). On précise `stat = "identity"` pour indiquer à `ggplot` d'utilise directement les valeurs de `n` déjà calculées. Le résultat est un diagramme en barres où la hauteur de chaque barre correspond au nombre d'étudiants d’une nationalité.
+
+Améliorons notre graphique en ré-ordonnant les barres par ordre décroissant et en ajoutant une légende : 
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  distinct(Name, Nationality) %>%
+  group_by(Nationality) %>%
+  count() %>%
+  ggplot(aes(x = reorder(Nationality, -n), y = n, fill = Nationality)) + 
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Number of Students by Nationality",
+    x = "Nationality",
+    y = "Count", 
+    caption = "D'après 'American Univerity Men of China' (1936)")
+
+```
+<br>
+
+**Explications**
+
+  * `group_by(Nationality) %>% count()` : comme précédemment, on regroupe par nationalité et on compte le nombre d’individus dans chaque catégorie.
+  * `aes(x = reorder(Nationality, -n), y = n, fill = Nationality)` : ordonne les barres par ordre décroissant de fréquence (au lieu de l’ordre alphabétique, comme précédemment). Le `-n` inverse l’ordre, de façon à mettre la nationalité la plus représentée en premier.
+  * `labs(...)` permet de personnaliser les étiquettes. Ici, en plus du titre et des étiquettes des axes, on a ajouté une légende (`caption`) pour indiquer de la source des données.
+
+  
+Autre exemple avec les disciplines, avec une apparence plus minimaliste : 
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  filter(!is.na(Field)) %>%
+  group_by(Field) %>%
+  count() %>%
+  ggplot(aes(x = reorder(Field, n), y = n, fill = Field)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Distribution by Field of Study",
+    y = "Count"
+  ) +
+  theme_minimal() + # on allège l'arrière-plan
+  theme(
+    axis.text.x = element_blank(),  # on enlève les étiquettes des graduations sur l'axe horizontal
+    axis.ticks.x = element_blank(), # on enlève les graduations sur l'axe horizontal
+  ) +
+  xlab(NULL) # supprime l'étiquette de l’axe horizontal.
+
+
+```
+
+<br>
+Autre exemple avec les universités : 
+
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  group_by(University) %>%
+  count() %>%
+  filter(n>5) %>%
+  ggplot(aes(x = reorder(University, n), y = n)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Distribution by University",
+    subtitle = "Most Popular Universities (n>5)",
+    x = NULL,
+    y = "Number of curricula",
+  ) 
+
+```
+<br>
+Pour comparer la distribution d'un variable entre deux groupes, on peut utiliser la fonction **facet_wrap()**. Par exemple comparons la distribution des disciplines chez les étudiants chinois et occidentaux : 
+```{r message = FALSE, warning = FALSE}
+
+auc_simple %>% 
+  filter(!Nationality == "Japanese") %>%
+  filter(!is.na(Field)) %>%
+  group_by(Nationality, Field) %>%
+  count() %>%
+  ggplot(aes(x = reorder(Field, n), y = n, fill = Field)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ Nationality) + 
+  labs(
+    title = "Disciplines by Nationality",
+    x = NULL,
+    y = "Number of curricula",
+    fill = "Field",
+  ) +
+  theme(
+    axis.text.x = element_blank(),  # remove tick labels
+    axis.ticks.x = element_blank(), # optionally remove tick marks too
+  ) +
+  xlab(NULL) + 
+  theme(legend.position = "bottom")
+
+```
+
+<br>
+**Explications**
+
+  * `filter(!Nationality == "Japanese")` : on exclut du graphique tous les étudiants japonais (on enlève du jeu de données toutes les lignes où "Nationality" vaut "Japanese". 
+  *  `group_by(Nationality, Field) %>% count()` : on crée un tableau croisé : on calcule combien d’étudiants appartiennent à chaque couple (nationalité, champ d’étude). Le résultat est une table avec trois colonnes : `Nationality`, `Field`, `n` (nombre d’occurrences pour ce couple).
+  * `facet_wrap(~ Nationality)` : on divise le graphique en plusieurs "panneaux" (facettes), un par nationalité. Chaque facette montre la répartition par discipline uniquement pour la nationalité correspondante. Cela permet de comparer visuellement les profils disciplinaires selon la nationalité.
+  * `aes(x = reorder(Field, n), y = n, fill = Field)` : les champs d’étude (`Field`) sont réordonnés dans chaque facette selon leur fréquence (`n`). Comme on a plusieurs nationalités, le classement des disciplines peut différer d’une facette à l’autre.
+  * `theme(...)` et `theme(legend.position = "bottom")` : comme précédemment, on allège l’axe des x (pas de ticks ni d’étiquettes). On choisit de placer la légende en bas du graphique (utile si les facettes sont nombreuses).
+
+## Scatterplot
+
+Pour croiser **deux variables quantitatives**, on utilise couramment un **nuage de points** (geom_point). Par exemple, croisons la période de formation et la durée totale des études :
+
+```{r message = FALSE, warning = FALSE}
+
+summary_years %>%  
+  ggplot(aes(study_start_year, study_duration)) +
+  geom_point() + 
+  labs(title = "Period and Duration of Study",
+       x = "Starting Year",
+       y = "Duration (years)", 
+       caption = "Based on 'American University Men of China' (1936)")
+
+```
+<br> 
+**Explications**
+
+  * `summary_years %>%` : on part du jeu de données `summary_years` créé précédement, qui contient les variables `study_start_year` (l’année de début des études) et `study_duration` (la durée des études, en années).
+  * `ggplot(aes(study_start_year, study_duration))` : l’axe *x* reçoit l’année de début, l’axe *y* reçoit la durée. Chaque observation (étudiant) va donc être représentée par un point positionné selon ces deux variables.
+  * `geom_point()` : on ajoute une couche de points, où chaque point = un étudiant / un parcours académique.
+  * `labs(...)` : on personnalise les titres et les axes. 
+
+
+Améliorons un peu l'esthétique de ce plot. La fonction **geom_jitter()** permet d'espacer les points en introduisant du bruit aléatoire et l'argument **alpha** permet d'augmenter la transparence. Cela permet d'de rendre le graphique plus lisible et de mieux identifier les zones denses. Pour mieux visualiser la tendance, on a aussi tracé une courbe de tendance avec la fonction **geom_abline()** : 
+
+```{r message = FALSE, warning = FALSE}
+
+summary_years %>%  
+  ggplot(aes(study_start_year, study_duration)) +
+  geom_jitter(alpha = 0.7) + 
+  geom_smooth(method = "gam", se = TRUE, linewidth = 0.7) +
+  labs(title = "Period and Duration of Study",
+       x = "Starting Year",
+       y = "Duration (years)", 
+       caption = "Based on 'American University Men of China' (1936)")
+
+```
+<br>
+**Explications**
+
+  * **geom_jitter(...)** : variante de `geom_point()` qui ajoute un bruit aléatoire (jitter) pour désuperposer les points coincidents. `alpha = 0.7` rend les couleurs légèrement transparentes (70% opaque). 
+  * **geom_smooth()** : ajoute une courbe lissée via un **GAM** (Generalized Additive Model) pour montrer la tendance de `study_duration` (y) en fonction de `study_start_year` (x).
+  * `method = "gam"` : la méthode utilisée est Generalized Additive Model (GAM). C’est une méthode de lissage flexible qui permet de représenter une relation entre deux variables sans supposer qu’elle soit linéaire (droite) ou polynomiale (courbe de degré fixe). En pratique, le GAM découpe la courbe en morceaux lisses (spline) et les colle ensemble, ce qui permet d’épouser des formes complexes, ondulées, mais sans surajuster chaque point. Les autres méthodes disponibles sont "lm" (régression linéaire) et "loess" (Locally Estimated Scatterplot Smoothing), adaptée pour les petits jeux de données. Pour plus de détails, voir l'annexe. 
+  * `se = TRUE` trace l'intervalle de confiance autour du lissage.
+  * `linewidth` règle l’épaisseur du trait.
+
+
+Enfin, on peut modifier la couleur des points, par exemple, **colorier les points par nationalité** pour mieux les distinguer :
+```{r message = FALSE, warning = FALSE}
+
+summary_years %>%  
+  ggplot(aes(study_start_year, study_duration, color = Nationality)) +
+  geom_jitter(alpha = 0.7, show.legend = TRUE) + 
+  geom_smooth(method = "gam", se = TRUE, linewidth = 0.7) +
+  labs(title = "Period and Duration of Study",
+       x = "Starting Year",
+       y = "Duration (years)", 
+       color = "Nationality",
+       caption = "Based on 'American University Men of China' (1936)") +
+  theme_minimal()
+
+```
+
+## Boxplots 
+
+Les boxplots (diagrammes en boîte, ou "boîtes à moustache") sont utilisés pour croiser une variable catégorielle (par exemple, la nationalité) et une variable quantitative (par exemple, la durée des études) : 
+```{r message = FALSE, warning = FALSE}
+
+summary_years %>% 
+  filter(!is.na(study_duration)) %>%  
+  ggplot(aes(x= Nationality, y = study_duration, fill = Nationality)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  labs(title = "Duration of studies by nationality", 
+       x = NULL,
+       y = "Years",
+       fill = NULL,
+       caption = "Based on 'American University Men in China' (1936)") 
+
+```
+
+**Explications**
+
+  * `summary_years %>% filter(!is.na())` : on part du jeu de données `summary_years` qui contient la durée des études (study_duration) et la nationalité des étudiants (Nationality). On enlève toutes les lignes où la variable durée (`study_duration`) est manquante (NA). Cela évite que des valeurs vides perturbent le graphique. 
+  * `ggplot(aes(x = Nationality, y = study_duration, fill = Nationality))` : définition du graphique avec ggplot : l’axe horizontal représente les différentes nationalités (`x = Nationality`), l’axe vertical indique la durée des études en années (`y = study_duration`), les couleurs de remplissage sont attribuées selon la nationalité (`fill = Nationality`).
+  * `geom_boxplot` : ajout du boxplot (médiane, quartiles, valeurs extrêmes) ; `alpha = 0.7` rend les couleurs légèrement transparentes (70% opaque); `show.legend = FALSE` supprime la légende, puisque les couleurs des boîtes sont déjà identifiées par l’axe des x.
+  * `labs()` : ajout des titres et des étiquettes comme précédemment. 
+
+
+## Plots interactifs 
+
+Tous les graphiques précédents peuvent être transformés en graphiques interactifs grâce au package **plotly** et sa fonction **ggplotly()**. Noter cependant que certains éléments de légende peuvent être perdus lors de la conversion. 
+
+Installer et charger le package plotly: 
+```{r message = FALSE, warning = FALSE, eval= FALSE}
+
+install.packages(plotly)
+library(plotly)
+
+```
+
+### Histogram
+
+```{r message = FALSE, warning = FALSE}
+
+p1 <- auc_simple %>% 
+  filter(!is.na(Start)) %>% 
+  ggplot(aes(x=Start)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "Period of study in America", 
+       x = "Year",
+       y = "Number of curricula")
+
+ggplotly(p1)
+
+```
+
+### Barplot
+
+```{r message = FALSE, warning = FALSE}
+p2 <- auc_simple %>% 
+  filter(!is.na(Field)) %>%
+  group_by(Field) %>%
+  count() %>%
+  ggplot(aes(x = reorder(Field, n), y = n, fill = Field)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Distribution by Field of Study",
+    y = "Count"
+  )
+
+ggplotly(p2)
+
+```
+
+### Scatterplot 
+
+```{r message = FALSE, warning = FALSE}
+
+p3 <- summary_years %>%  
+  ggplot(aes(study_start_year, study_duration)) +
+  geom_point() + 
+  labs(title = "Period and Duration of Study",
+       x = "Starting Year",
+       y = "Duration (years)", 
+       caption = "Based on 'American University Men of China' (1936)")
+
+
+ggplotly(p3)
+
+```
+
+### Boxplots
+
+```{r message = FALSE, warning = FALSE}
+
+p4 <- summary_years %>% 
+  filter(!is.na(study_duration)) %>%  
+  ggplot(aes(x= Nationality, study_duration, fill = Nationality)) +
+  geom_boxplot() +
+  labs(title = "Duration of studies by nationality", 
+       x = NULL,
+       y = "Years",
+       fill = "Nationality",
+       caption = "Based on 'American University Men in China' (1936)") 
+
+ggplotly(p4)
+
+```
+
+<div class="alert alert-success" role="alert"> 
+**Note**: Vous pouvez sauvegarder et exporter tous vos plots depuis la fenêtre "Plots" en bas à droite de l'interface R Studio.</div>
+
+Pour connaître l'éventail des visualisations possibles avec des exemples de code, vous pouvez explorer [R Gallery](https://r-graph-gallery.com/).  
+
+## Quizz
+
+  1. Comparer le profil des étudiants chinois et occidentaux (périodisation, choix de formation, secteur d'emploi). 
+  2. Comment évolue la durée des études au fil des générations ?
+  3. La formation des étudiants est-elle en adéquation avec l'emploi qu'ils occupent en 1936 ?
+  4. Peut-on identifier des liens privilégiés entre certaines universités et certains employeurs ? 
+
+# 5. Pour aller plus loin
+
+## Analyses multidimensionnelles
+
+Les analyses multidimensionnelles regroupent un ensemble de méthodes statistiques exploratoires visant à étudier des ensembles de données complexes comportant plusieurs variables. Leur objectif est de réduire la dimensionnalité des données tout en préservant au mieux l’information, afin de découvrir des structures latentes (comme des groupes ou des tendances), visualiser des relations entre individus (lignes) et variables (colonnes), ou d'identifier des corrélations et des associations significatives. 
+
+Les méthodes les plus utilisées includent **l’Analyse en Composantes Principales** (ACP) (pour croiser des variables quantitatives),  **l’Analyse des Correspondances Multiples (ACM)** (pour croiser des variables qualitatives), et **l’Analyse Factorielle des Correspondances (AFC)** utilisée pour croiser deux variables qualitatives à partir de tableaux de contingence (ou tableaux croisés). Un **tableau de contingence** est un tableau à double entrée qui croise deux variables qualitatives en indiquant, pour chaque combinaison de modalités, le nombre d’occurrences (ou effectifs) observées.
+
+Ici, nous allons introduire très brièvement l'analyse des correspondances, en étudiant la corrélation entre la discipline de formation et le secteur d'emploi des étudiants dans notre jeu de données.
+
+Commençons par sélectionner les variables à croiser et à construire le tableau de continence : 
+```{r message = FALSE, warning = FALSE}
+
+library(tidyr)
+
+auc_field_sector <- auc_simple %>%
+  distinct(Name, Field, Sector) %>%
+  drop_na(Field, Sector) %>%
+  group_by(Field, Sector) %>%
+  tally() %>%
+  pivot_wider(names_from = Field, values_from = n, values_fill = 0)
+
+```
+
+<br> 
+**Explications ligne à ligne** : 
+
+  1. Charger le package **tidyr**, qui fournit des fonctions pour réorganiser les données (tally, pivot_wider).
+  2. **distinct(Name, Field, Sector)** : sélectionne les lignes uniques selon la combinaison des colonnes Name, Field, et Sector, pour éviter les doublons (les individus qui ont suivi deux formations dans la même discipline biaisent les calculs d'effectifs). 
+  3. **drop_na(Field, Sector)** : supprime les lignes contenant des valeurs manquantes (NA) dans les colonnes Field ou Sector.
+  4. **group_by(Field, Sector)**: regroupe les données par couples de modalités Field et Sector, en vue d’effectuer des calculs groupés.
+  5. **tally()** : compte le nombre d’occurrences (lignes) pour chaque combinaison Field–Sector. Le résultat est une table avec les colonnes Field, Sector et n (le compte).
+  6. **pivot_wider()** : réorganise les données en tableau croisé, où chaque modalité de Field devient une colonne (names_from = Field), tandis que Sector reste la colonne principale à gauche (lignes). Les valeurs de n (comptages d'effectifs) deviennent les cellules (values_from = n). On remplit les cellules par 0 lorsque combinaisons Sector x Field n’existent pas dans les données (**values_fill = 0**).
+
+Le résultat (auc_field_sector) est donc un tableau de contingence où les secteurs sont en lignes, les champs en colonnes, et les cellules indiquent le nombre d’individus pour chaque couple (Sector, Field).
+
+Ensuite, on charge le package FactoMinR - l'un des principaux packages pour les analyses multidimensionnelles et l'on applique la fonction **CA()** à notre table de contingence pour réaliser l'analyse de correspondence :  
+
+```{r message = FALSE, warning = FALSE}
+
+library(tidyverse)
+
+auc_field_sector_ca <- column_to_rownames(auc_field_sector, var = "Sector") 
+
+library(FactoMineR)
+
+res.ca <- CA(auc_field_sector_ca, graph = FALSE)
+
+
+```
+
+<br> 
+Important à retenir : La **fonction CA()** du package FactoMineR requiert que les noms des modalités (par exemple, les secteurs) ne figurent pas comme une colonne ordinaire du tableau, mais soient placés dans la colonne des noms de lignes (rownames). Pour cela, on utilise la fonction **column_to_rownames()** fournie par le package **tidyverse** en spécifiant le nom de la colonne à convertir via l’argument (var =).
+
+Le résultat d'une analyse des correspondances est typiquement visualisé sous la forme d’un graphique en deux dimensions, avec deux axes, sur lesquels sont projetées les modalités des variables. Les colonnes (correspondant aux disciplines) sont représentées en rouge, tandis que les lignes (correspondant aux secteurs) apparaissent en bleu. Les modalités proches dans l’espace sont interprétées comme étant fortement corrélées.
+
+```{r message = FALSE, warning = FALSE}
+
+plot.CA(res.ca, title="Field of Study and Sector of Employment", cex=0.7, cex.main=0.8, cex.axis=0.7)
+
+```
+
+<div class="alert alert-success" role="alert"> 
+Astuces : Le package **FactoMineR** a pour compagnon le package **Factoshiny** qui fournit une interface prête à l'emploi où l'on peut directement lancer l'analyse et visualiser plus confortablement les résultats. On peut aussi utiliser le package **exploR** qui fournit une interface agréable avec des visualisations interactives. Noter la différence entre les deux fonctions : la fonction **Factoshiny()** est appliquée directement sur la table de conteingence, tandis que la fonction **explor()** est appliquée sur les résultats de l'analyse de correspondence. 
+  
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(Factoshiny)
+Factoshiny(auc_field_sector_ca)
+
+library(explor)
+explor(res.ca)
+
+```
+</div>
+
+
+Pour plus de détails sur les analyses multidimensionnelles avec R, vous pouvez consulter l'excellent cours de [François Husson sur FUN Mooc](https://www.fun-mooc.fr/fr/cours/analyse-des-donnes-multidimensionnelles/).
+
+
+## Analyses relationnelles (Sankey/Flow chart) 
+
+Dans cette section, nous allons voir comment constuire un **Sankey diagram** (ou diagramme de flux) pour voir s'il y des liens plus ou moins forts entre les universités où les étudiants ont étudié et les institutions où ils sont employés. 
+
+On commence par sélectionner les variables que l'on veut mettre en relation (e.g., les universités et les employeurs) :  
+```{r message = FALSE, warning = FALSE}
+
+univ_employ <- auc_simple %>% 
+  distinct(Name, University, Employer) %>% 
+  select(University, Employer) %>% 
+  drop_na(University, Employer)
+
+```
+<br>
+On utilise la fonction **distinct()** pour supprimer les doublons afin de ne pas biaiser les comptages de fréquences. On convoque la fonction **drop_na()** pour supprimer les lignes avec des valeurs manquantes. 
+
+Ensuite, on crée la **table des liens** et on calcule le **poids des liens (wght)** pour chaque paire en utilisant la combinaison **group_by() %>% count()**. La dernière ligne trie les liens par ordre décroissant de poids pour avoir un aperçu des flux les plus fréquents : 
+```{r message = FALSE, warning = FALSE}
+
+link <- univ_employ %>% 
+  rename(source = University, target = Employer) %>%
+  group_by(source, target) %>% 
+  count() %>% 
+  rename(wght = "n")
+
+link %>% arrange(desc(wght))
+
+```
+<br>
+On choisit de ne visualiser que les liens les plus forts (ayant un poids de 2 ou plus) et on crée la liste des noeuds uniques (universités et employeurs) qu'ils relient : 
+```{r message = FALSE, warning = FALSE}
+
+# on sélection les liens les plus forts (au moins un poids de 2)
+
+strong_link <- link %>% filter(wght>1)
+
+# on crée la liste de noeuds et on attribue un identifiant unique (name) à chaque noeud
+
+node <- data.frame(
+  name=c(as.character(strong_link$source), 
+         as.character(strong_link$target)) %>% unique()
+)
+
+
+# on crée un identifiant unique pour chaque lien 
+
+strong_link$IDsource <- match(strong_link$source, node$name)-1 
+strong_link$IDtarget <- match(strong_link$target, node$name)-1
+
+```
+<br> 
+On peut maintenant visualiser les liens sous forme de Sankey avec la fonction **sankeyNetwork()** fournie par le package **networkD3**: 
+
+```{r message = FALSE, warning = FALSE}
+
+library(networkD3)
+
+p <- sankeyNetwork(Links = strong_link, Nodes = node,
+                   Source = "IDsource", Target = "IDtarget",
+                   Value = "wght", NodeID = "name", 
+                   sinksRight=FALSE)
+p
+
+```
+<br>
+Vous pouvez sauvegarder votre visualisation sous forme html grâce au package **htmlwidgets** (remplacer "univ_to_employ" par le nom de votre choix).
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(htmlwidgets)
+
+saveWidget(p, file=paste0( getwd(), "/univ_to_employ.html"))
+
+```
+
+
+
+# Aide-mémoire
+
+## Glossaire des termes 
+
+| Terme                        | Description                                                                                  | Exemples                                                   |
+|-----------------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| Console                     | Interface dans laquelle on tape et exécute des commandes directement.                        | `> 2 + 2` retourne `4`                                     |
+| Dataframe                   | Tableau structuré composé de lignes (observations) et colonnes (variables).                 | `auc`, `my_data <- data.frame(...)`                        |
+| Environnement               | Espace contenant les objets créés durant la session R (variables, fonctions, dataframes…).  | Variables visibles dans le panneau "Environment" de RStudio |
+| Fonction                    | Outil qui exécute une opération définie à partir d’arguments.                               | `mean(x)`, `sum(x, na.rm = TRUE)`                          |
+| Librairie                   | Espace mémoire dans lequel les packages sont chargés pour être utilisés.                    | `library(dplyr)`, `library(ggplot2)`                       |
+| Liste                       | Collection d’objets de différents types ou structures.                                      | `list(a = 1, b = c("x", "y"), c = TRUE)`                   |
+| Matrice                     | Tableau de données à deux dimensions, avec un seul type de données.                         | `matrix(1:9, nrow = 3)`                                    |
+| Observations / Lignes / Rows| Chaque ligne du tableau représente une observation, un cas individuel.                     | Ligne 1 = individu `Ting_H.N.` dans `auc`                  |
+| Package                     | Ensemble de fonctions, jeux de données et documentation conçus pour des usages spécifiques. | `dplyr`, `ggplot2`                                         |
+| Script                      | Fichier texte contenant une suite de commandes R. Sert à automatiser ou documenter un travail.| `mon_script.R`, `analysis.R`                               |
+| Table de contingence        | Table croisant deux variables catégorielles pour observer leur distribution conjointe.      | `table(df$var1, df$var2)`                                  |
+| Tibble                      | Version modernisée d’un dataframe, avec affichage plus clair et usage adapté à la programmation en R (via le tidyverse). | `as_tibble(auc)`, `tibble(x = 1:5, y = letters[1:5])` |
+| Valeurs                     | Cellules individuelles d’un dataframe : intersection entre une ligne et une colonne.        | `Year_start = 1915` pour la première ligne de `auc`        |
+| Variables / Colonnes        | Chaque colonne représente une caractéristique mesurée sur les observations.                | `Nationality`, `Field` dans `auc`                          |
+
+
+## Principales classes d'objets R
+
+| Classe         | Source         | Rôle principal                                                          |
+| -------------- | -------------- | ----------------------------------------------------------------------- |
+| `spec_tbl_df`  | `readr`        | Tibble avec métadonnées de types de colonnes                            |
+| `tbl_df`       | `tibble`       | Tibble (version modernisée de data.frame)                               |
+| `tbl`          | `dplyr`        | Table générique utilisée dans le tidyverse                              |
+| `data.frame`   | Base R         | Structure de données tabulaire classique                                |
+| `matrix`       | Base R         | Tableau bidimensionnel homogène (même type dans toutes les cellules)    |
+| `list`         | Base R         | Collection hétérogène d’objets indexés                                  |
+| `factor`       | Base R         | Variable catégorielle avec des niveaux (utilisée pour les statistiques) |
+| `numeric`      | Base R         | Vecteur de nombres (réels ou entiers)                                   |
+| `integer`      | Base R         | Vecteur de nombres entiers                                              |
+| `character`    | Base R         | Vecteur de chaînes de caractères                                        |
+| `logical`      | Base R         | Vecteur de booléens (`TRUE` / `FALSE`)                                  |
+| `Date`         | Base R         | Objet représentant une date                                             |
+
+## Index des fonctions 
+
+<style type="text/css">
+.tg  {border-collapse:collapse;border-color:#93a1a1;border-spacing:0;}
+.tg td{background-color:#fdf6e3;border-color:#93a1a1;border-style:solid;border-width:1px;color:#002b36;
+  font-family:Arial, sans-serif;font-size:14px;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{background-color:#657b83;border-color:#93a1a1;border-style:solid;border-width:1px;color:#fdf6e3;
+  font-family:Arial, sans-serif;font-size:14px;font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-0pky{border-color:inherit;text-align:left;vertical-align:top}
+</style>
+<table class="tg" style="undefined;table-layout: fixed; width: 843px"><colgroup>
+<col style="width: 162.375px">
+<col style="width: 95.375px">
+<col style="width: 341.375px">
+<col style="width: 243.375px">
+</colgroup>
+<thead>
+  <tr>
+    <th class="tg-0pky">Fonction</th>
+    <th class="tg-0pky">Source (Package)</th>
+    <th class="tg-0pky">Description</th>
+    <th class="tg-0pky">Exemple</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td class="tg-0pky">aes</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Spécifie les esthétiques (axes, couleur...)</td>
+    <td class="tg-0pky">aes(x = var1, y = var2)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">arrange</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Trie un data.frame selon une ou plusieurs colonnes.</td>
+    <td class="tg-0pky">arrange(df, desc(age))</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">as.data.frame</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Convertit un objet en dataframe</td>
+    <td class="tg-0pky">as.data.frame(matrix_obj)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">CA</td>
+    <td class="tg-0pky">FactoMineR</td>
+    <td class="tg-0pky">Analyse des correspondances (correspondence analysis).</td>
+    <td class="tg-0pky">CA(df, quali.sup = 1)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">class</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Retourne la classe d’un objet</td>
+    <td class="tg-0pky">class(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">colSums</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Calcule la somme de chaque colonne</td>
+    <td class="tg-0pky">colSums(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">column_to_rownames</td>
+    <td class="tg-0pky">tibble</td>
+    <td class="tg-0pky">Convertit une colonne en noms de lignes (row names).</td>
+    <td class="tg-0pky">column_to_rownames(df, var = "id")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">coord_flip</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Inverse les axes x et y</td>
+    <td class="tg-0pky">coord_flip()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">count</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Compte les occurrences d’une variable</td>
+    <td class="tg-0pky">count(df, col)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">data.frame</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Crée une structure tabulaire classique.</td>
+    <td class="tg-0pky">data.frame(nom = c("A", "B"), age = c(25,   30))</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">distinct</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Extrait les lignes uniques</td>
+    <td class="tg-0pky">distinct(df, col)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">distinct</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Extrait les lignes distinctes d’un data.frame selon certaines colonnes.</td>
+    <td class="tg-0pky">distinct(df, nom)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">drop_na</td>
+    <td class="tg-0pky">tidyr</td>
+    <td class="tg-0pky">Supprime les lignes contenant des valeurs manquantes (NA).</td>
+    <td class="tg-0pky">drop_na(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">explor</td>
+    <td class="tg-0pky">explor</td>
+    <td class="tg-0pky">Ouvre une interface interactive pour explorer les résultats d’analyse.</td>
+    <td class="tg-0pky">explor(res.ca)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">Factoshiny</td>
+    <td class="tg-0pky">Factoshiny</td>
+    <td class="tg-0pky">Lance une interface Shiny pour analyses factorielles interactives.</td>
+    <td class="tg-0pky">Factoshiny(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">filter</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Filtre les lignes selon une condition</td>
+    <td class="tg-0pky">filter(df, col &gt; 10)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_bar</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Crée un diagramme en barres</td>
+    <td class="tg-0pky">geom_bar()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_boxplot</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Crée un boxplot</td>
+    <td class="tg-0pky">geom_boxplot()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_histogram</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Crée un histogramme</td>
+    <td class="tg-0pky">geom_histogram(bins = 30)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_jitter</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Ajoute du bruit pour éviter le chevauchement des points</td>
+    <td class="tg-0pky">geom_jitter()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_point</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Ajoute un nuage de points</td>
+    <td class="tg-0pky">geom_point()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">geom_smooth</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Ajoute une courbe de tendance</td>
+    <td class="tg-0pky">geom_smooth(method = "lm")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">ggplot</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Initialise une visualisation graphique</td>
+    <td class="tg-0pky">ggplot(df, aes(x, y))</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">ggplotly</td>
+    <td class="tg-0pky">plotly</td>
+    <td class="tg-0pky">Convertit un graphique ggplot2 en graphique interactif</td>
+    <td class="tg-0pky">ggplotly(p)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">group_by</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Crée des groupes selon une ou plusieurs variables</td>
+    <td class="tg-0pky">group_by(df, group_col)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">head</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Affiche les premières lignes d'un objet</td>
+    <td class="tg-0pky">head(df, 6)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">install.packages</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Installe un package</td>
+    <td class="tg-0pky">install.packages("dplyr")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">is.na</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Teste la présence de valeurs manquantes (NA)</td>
+    <td class="tg-0pky">is.na(df$x)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">labs</td>
+    <td class="tg-0pky">ggplot2</td>
+    <td class="tg-0pky">Ajoute des étiquettes aux axes et au titre</td>
+    <td class="tg-0pky">labs(title = "Titre")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">library</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Charge un package</td>
+    <td class="tg-0pky">library(dplyr)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">match</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Donne les positions des éléments d’un vecteur dans un autre.</td>
+    <td class="tg-0pky">match(c("A", "B"), df$col)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">mutate</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Crée ou modifie des colonnes</td>
+    <td class="tg-0pky">mutate(df, new_col = old_col * 2)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">names</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Retourne ou modifie les noms des colonnes</td>
+    <td class="tg-0pky">names(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">pivot_wider</td>
+    <td class="tg-0pky">tidyr</td>
+    <td class="tg-0pky">Transforme un tableau long en tableau large (wide format).</td>
+    <td class="tg-0pky">pivot_wider(df, names_from = variable, values_from = valeur)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">plot.CA</td>
+    <td class="tg-0pky">FactoMineR (méthode)</td>
+    <td class="tg-0pky">Fonction de tracé pour les objets d’analyse des correspondances.</td>
+    <td class="tg-0pky">plot.CA(obj)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">read_csv</td>
+    <td class="tg-0pky">readr</td>
+    <td class="tg-0pky">Lit un fichier CSV en tant que tibble</td>
+    <td class="tg-0pky">read_csv("data.csv")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">read_delim</td>
+    <td class="tg-0pky">readr</td>
+    <td class="tg-0pky">Lit un fichier délimité par un séparateur spécifié</td>
+    <td class="tg-0pky">read_delim("data.txt", delim="\t")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">relocate</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Change l’ordre des colonnes</td>
+    <td class="tg-0pky">relocate(df, col, .before = col2)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">rename</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Renomme des colonnes</td>
+    <td class="tg-0pky">rename(df, new = old)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">reorder</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Réorganise les niveaux d’un facteur</td>
+    <td class="tg-0pky">reorder(factor, value)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">sankeyNetwork</td>
+    <td class="tg-0pky">networkD3</td>
+    <td class="tg-0pky">Crée un diagramme de Sankey interactif.</td>
+    <td class="tg-0pky">sankeyNetwork(Links, Nodes, ...)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">saveWidget</td>
+    <td class="tg-0pky">htmlwidgets</td>
+    <td class="tg-0pky">Sauvegarde une visualisation HTML interactive (Shiny, D3, etc.).</td>
+    <td class="tg-0pky">saveWidget(p, "graph.html")</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">select</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Sélectionne des colonnes</td>
+    <td class="tg-0pky">select(df, col1, col2)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">summarise</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Crée un résumé statistique des groupes</td>
+    <td class="tg-0pky">summarise(df, avg = mean(col))</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">summary</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Affiche un résumé statistique des colonnes</td>
+    <td class="tg-0pky">summary(df)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">tally</td>
+    <td class="tg-0pky">dplyr</td>
+    <td class="tg-0pky">Compte les occurrences pour chaque combinaison d'une variable/groupement.</td>
+    <td class="tg-0pky">df %&gt;% group_by(sexe) %&gt;% tally()</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">unique</td>
+    <td class="tg-0pky">base</td>
+    <td class="tg-0pky">Renvoie les valeurs uniques d’un vecteur ou lignes uniques d’un   data.frame.</td>
+    <td class="tg-0pky">unique(df$nom)</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">View</td>
+    <td class="tg-0pky">utils (base)</td>
+    <td class="tg-0pky">Affiche les données dans une nouvelle fenêtre en mode tableur</td>
+    <td class="tg-0pky">View(df)</td>
+  </tr>
+</tbody></table>
+
+## Données manquantes
+
+| Objectif                 | Commande                    |
+| ------------------------ | --------------------------- |
+| Y a-t-il des NA ?        | `anyNA(df)`                 |
+| Position des NA          | `is.na(df)`                 |
+| Nombre de NA par colonne | `colSums(is.na(df))`        |
+| Nombre de NA par ligne   | `rowSums(is.na(df))`        |
+| Lignes contenant des NA  | `df[!complete.cases(df), ]` |
+| Lignes complètes         | `df[complete.cases(df), ]`. |
+| Visualiser les NA        | `naniar::gg_miss_var(df)`   |
+
+## Où trouver de l'aide ?
+
+  1. **Aide sur les packages** : ?nom_du_package (à taper directement dans la console pour ouvrir la page d'aide)
+  2. **Aide sur les fonctions** : ??nom_de_la_function (à taper directement dans la console)
+  3. **[Cheatsheets](https://posit.co/resources/cheatsheets/)**: aide-mémoires pour les principaux packages
+  4. **[Stack Overflow](https://stackoverflow.com/)** : le forum de référence jusqu'à l'arrivée de ChatGPT et autres interfaces d'intelligence artificielle, et qui reste extrêmement dynamique et utile. Avant de soumettre une nouvelle question sur le forum, vérifiez qu'elle n'a pas déjà été soulevée par la communauté (c'est généralement le cas). Pour trouver la solution, la clé est de bien formuler le problème, en utilisant les termes précis et appropriés.  
+  5. **ChatGPT, Claude, et autres IA conversationnelles** : désormais le plus fidèle compagnon des codeurs, mais là encore, la qualité de la réponse de l'IA dépend de notre maîtrise du langage R et notre capacité à formuler clairement le problème, en utilisant les bons concepts. On peut distinguer deux usages principaux : (1) **Solution d'erreur** : on peut copier directement le message d'erreur dans le prompt en donnant le maximum de contexte. (2) **Rédaction de code**: commencer par décrire les données ou les injecter directement dans le prompt (ou un échantillon si trop volumineux), décrire la tâche le plus clairement possible et donner les instructions en donnant le maximum de contexte (éventuellement spécifier le package à utiliser et l'approche souhaitée). Noter que les outils d'IA offrent désormais des extensions spécifiques pour la rédaction de code (Codex, Claude Code, etc). 
+  
+# Références 
+
+## Ressources générales sur R 
+
+  1. [The Comprehensive R Archive Network (CRAN)](https://cran.r-project.org/): plateforme officielle de distribution des packages R, permettant d’accéder, d’installer et de mettre à jour des bibliothèques pour le langage R. 
+  2. [Introduction à R et au tidyverse](https://juba.github.io/tidyverse/)
+  3. [R for Data Science](https://rafalab.github.io/dsbook/)
+
+## Pour aller plus loin 
+
+  4. [Cookbook spécialement pour les historiens et sciences sociales](http://dh-r.lincolnmullen.com)
+  5. [Resources for R](https://gkhajduk.github.io/R-resources/)
+  6. [RPubs](https://rpubs.com/) : plateforme de publication de tutos orientés R.
+
