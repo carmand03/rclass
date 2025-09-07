@@ -1,0 +1,1859 @@
+---
+title: "Cours 2 : Analyse de Corpus avec R"
+author: "Cécile Armand"
+date: "2025-10-08"
+
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    number_sections: false
+    code_folding: show # hide
+    fig_caption: true
+    df_print: paged
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(histtext)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidytext)
+library(textdata)
+library(quanteda)
+library(quanteda.textstats)
+library(tidyverse)
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(tidyr)
+library(stm)
+library(knitr)
+library(kableExtra)
+
+```
+
+# Introduction
+
+## Objectifs 
+
+Cette séance a pour objectif d'apprendre à traiter des données non structurées (texte brut) et se familiariser avec les principales méthodes d'analyse issues de la linguistique de corpus et du traitement automatique des langues.
+
+## Corpus d'étude
+
+Le corpus d'étude contient tous les articles qui mentionnent Lyon dans la presse anglophone en Chine pré-communiste (avant 1949). La source est la collection de journaux historiques [ProQuest](https://stage-about.proquest.com/tr/products-services/hnp_cnc/) accessibles dans la [Modern China Textual Database](https://www.enpchina.eu/).
+
+Chargez le corpus d'étude : 
+
+```{r warning = FALSE, message = FALSE, echo=FALSE}
+
+load(file = "~/RClass/Cours2/Cours2.RData")
+
+```
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+library(readr)
+
+lyon_corpus <- read_csv("~/Data/lyon_corpus.csv")
+
+```
+
+
+```{r warning = FALSE, message = FALSE}
+
+names(lyon_corpus)
+
+lyon_corpus %>% 
+  head(n = 5) %>% 
+  kable() %>% 
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+<br>
+
+
+## Quizz 
+
+<div class="alert alert-primary" role="alert"> 
+  1. Combien d'articles contient le corpus?  
+  2. Quelles sont les métadonnées disponibles ?  </div>
+
+# Explorer les métadonnées
+
+## Titres sources
+
+Listons les publications (variable "Source") qui parlent de Lyon en Chine et analysons la répartition des résultats (articles) entre ces journaux : 
+```{r warning = FALSE, message = FALSE}
+
+lyon_corpus %>% 
+  group_by(Source) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/18986*100, 2))
+
+```
+<br>
+<div class="alert alert-primary" role="alert"> 
+**Questions:**
+
+  1. Comment se répartissent les articles entre les différents journaux ? Dans quels journaux notre objet d'étude (Lyon) est-il le plus évoqué ?  
+  2. Sélectionner les titres de presse qui comportent plus de 10 articles.</div>
+  
+```{r warning = FALSE, message = FALSE, eval = FALSE, echo = FALSE}
+
+# Option 1 : à partir du nom des journaux (si peu nombreux)
+
+lyon_corpus_filtered <- lyon_corpus %>% 
+  filter(!Source %in% c("The Chinese Repository", "The Chinese Recorder"))
+
+# Option 2 : à partir des fréquences d'articles (si la liste à exclure est plus longue)
+
+top_source <- lyon_corpus %>% group_by(Source) %>% count() %>% filter(n>10)
+lyon_corpus_filtered <- lyon_corpus %>% filter(Source %in% top_source$Source)
+
+```
+
+## Catégories d'articles
+
+Dans quelles catégories d'articles "Lyon" est-elle mentionnée ?
+
+```{r warning = FALSE, message = FALSE}
+
+lyon_corpus %>% 
+  group_by(category) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/18986*100, 2))
+
+```
+
+<br> 
+**Note:** les catégories fournies dans la source d'origine présentent une grande diversité et un certain manque de cohérence. Afin de faciliter l’analyse, il est utile de rationaliser travail de regroupement a été effectué pour homogénéiser les catégories d'origine. Les choix opérés pour ces regroupements sont explicités ci-dessous, accompagnés du code utilisé pour les mettre en œuvre. 
+
+<div class="alert alert-success" role="alert"> 
+
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;}
+.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-j6zm{font-weight:bold;text-align:left;vertical-align:bottom}
+.tg .tg-7zrl{text-align:left;vertical-align:bottom}
+</style>
+<table class="tg" style="undefined;table-layout: fixed; width: 472px"><colgroup>
+<col style="width: 272.375px">
+<col style="width: 199.375px">
+</colgroup>
+<thead>
+  <tr>
+    <th class="tg-j6zm">Catégorie Source</th>
+    <th class="tg-j6zm">Catégorie Normalisée</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td class="tg-7zrl">Feature, Article / Article, Feature</td>
+    <td class="tg-7zrl">Feature/Article</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Advertisement types</td>
+    <td class="tg-7zrl">Advertisement</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Editorial, Commentary, Letter, Cartoon</td>
+    <td class="tg-7zrl">Opinion/Editorial</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Obituary, Marriage, Birth Notice</td>
+    <td class="tg-7zrl">Announcements</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Stock Quote</td>
+    <td class="tg-7zrl">Market Info</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Image, Photograph, Illustration</td>
+    <td class="tg-7zrl">Visual/Graphic</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Table of Contents, Front Matter</td>
+    <td class="tg-7zrl">Layout/Meta</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Front Page, General Info, News</td>
+    <td class="tg-7zrl">General News</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Review</td>
+    <td class="tg-7zrl">Review</td>
+  </tr>
+  <tr>
+    <td class="tg-7zrl">Others</td>
+    <td class="tg-7zrl">Other</td>
+  </tr>
+</tbody></table>
+
+**Code pour nettoyer et normaliser les catégories d'articles**: 
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+lyon_corpus <- lyon_corpus %>%
+  # Etape 1: Standardiser les catégories
+  mutate(category_clean = str_replace_all(category, fixed("Article, Feature"), "Feature, Article"),
+         category_clean = str_replace_all(category_clean, fixed("Classified Advertisement, Advertisement"), "Advertisement, Classified Advertisement"),
+         category_clean = str_replace_all(category_clean, fixed("Commentary, Editorial"), "Editorial, Commentary")) %>%
+  
+  # Step 2: Regrouper/Rationaliser 
+  mutate(category_group = case_when(
+    str_detect(category_clean, "Feature") ~ "Feature/Article",
+    str_detect(category_clean, "Article") ~ "Feature/Article",
+    str_detect(category_clean, "Advertisement") ~ "Advertisement",
+    str_detect(category_clean, "Editorial|Commentary|Letter to the Editor|Correspondence|Cartoon") ~ "Opinion/Editorial",
+    str_detect(category_clean, "Stock Quote") ~ "Market Info",
+    str_detect(category_clean, "News|Front Page|General Information") ~ "General News",
+    str_detect(category_clean, "Obituary|Birth Notice|Marriage Announcement") ~ "Announcements",
+    str_detect(category_clean, "Image|Photograph|Illustration") ~ "Visual/Graphic",
+    str_detect(category_clean, "Table of Contents|Front Matter|Credit/Acknowledgement") ~ "Layout/Meta",
+    str_detect(category_clean, "Review") ~ "Review",
+    TRUE ~ "Other"
+  ))
+
+```
+</div>
+
+<br>
+
+**Explications**
+
+**Vue d’ensemble**
+
+  1. On part du corpus d'origine (lyon_corpus)
+  2. On crée une nouvelle colonne *category_clean* (version "standardisée" de la variable d'origine *category* 
+  3. On créer une deuxième colonne *category_group* (une plus grande famille attribuée à partir de *category_clean*).
+  
+**Les briques utilisées**
+
+  * **%>%** : l’opérateur **pipe** (package magrittr/dplyr) qui enchaîne les opérations de gauche à droite.
+  * **mutate()** (dplyr) : ajoute ou modifie des colonnes.
+  * **str_replace_all()** (stringr) : remplace toutes les occurrences d’un motif dans un champ donné. Dans la première ligne, par exemple, on remplace tous les motifs *Article, Feature* contenu dans la variable *category* par la formule *Feature, Article*, que l'on place une nouvelle variable *category_clean* créée avec mutate. A noter : le motif et sa formule de remplacement doivent être placés entre guillemets (mais pas la variable qui les contient.) 
+  * **fixed()** (stringr) : indique que le motif est du texte littéral (par opposition à *regex* (expression régulière) qui tolère des variations dans le motif).
+  * **case_when()** (dplyr) : crée une valeur selon la première condition vraie ((if/elseif…) (c'est une généralisation de la formule "if else"). **case_when()** évalue les conditions dans l’ordre et retourne la première correspondance (c'est important si plusieurs motifs peuvent correspondre).
+  * **str_detect()** (stringr) : teste si une chaîne contient un motif. Cette fonction utilise une expression régulière : "A|B|C" veut dire "A ou B ou C". Ici, on teste la présence de mots-clés pour leur affecter un groupe. Par exemple : si *category_clean* contient "Feature" ou "Article" → "Feature/Article". Si elle contient "Editorial" ou "Commentary" ou "Letter to the Editor" → "Opinion/Editorial". Sinon, on tombe dans la catégorie par défaut "Other".
+
+
+<br>
+Après ce travail de rationalisation, on obtient la répartition suivante, plus frappante et facile à analyser : 
+
+```{r warning = FALSE, message = FALSE}
+
+lyon_corpus %>% 
+  group_by(category_clean) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/18986*100, 2))
+
+lyon_corpus %>% 
+  group_by(category_group) %>% 
+  count(sort = TRUE) %>% 
+  mutate(percent = round(n/18986*100, 2))
+
+```
+
+
+
+## Distribution temporelle
+
+Pour analyser la distribution des articles au cours du temps, on peut utiliser un histogramme (comme on l'a vu dans le cours précédent), en prenant les années comme unité temporelle. 
+
+Pour cela, il faut d'abord extraire l'année de publication à partir du champ "Date". On peut utiliser pour cela la fonction **str_sub()** du package **stringr** (ou la suite **tidyverse** qui contient le package **stringr**) : 
+
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+library(stringr)
+
+lyon_corpus <- lyon_corpus %>% 
+  mutate(Year = stringr::str_sub(Date,0,4)) %>% 
+  mutate(Year = as.numeric(Year)) 
+
+```
+<br>
+**Explications** 
+
+  * On crée une nouvelle colonne "Year" (en utilisation la fonction **mutate()**) à partir de la colonne "Date" en extrayant les 4 premiers caractères (qui correspondent à l'année).
+  * **stringr::str_sub(Date, 0, 4)** : on prend la colonne Date et lui applique la fonction **str_sub(x, start, end)** pour extraire les caractères de la position start à end (ici, start = 0 et end = 4) (par convention, 0 correspond au premier caractère de la chaîne).
+  * **as.numeric(Year)** convertit la chaîne de caractères en valeur numérique : c'est une étape nécessaire pour construire un histogramme ou simplement si l'on veut trier les articles par année. 
+
+```{r warning = FALSE, message = FALSE}
+
+lyon_corpus %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = "striped")
+
+```
+<br>
+A partir de la nouvelle variable "Year" que nous venons de créer, on peut visualiser la distribution temporelle sous forme d'histogramme. On applique la fonction **geom_histogram()** fournie par le package **ggplot2** (revoir le premier cours) : 
+
+```{r warning = FALSE, message = FALSE}
+
+library(ggplot2)
+
+lyon_corpus %>% 
+  ggplot(aes(x=Year)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "Lyon dans la presse anglophone en Chine", 
+       subtitle = "Distribution temporelle (1850-1950)", 
+       x = "Année",
+       y = "Nombre d'articles")
+
+
+```
+<br> 
+<div class="alert alert-primary" role="alert"> 
+**Questions:**
+
+  1. Quels sont les pics d'intérêt (et les creux) ?
+  2. Réduire le corpus pour se concentrer uniquement sur la période centrale (1907-1941). </div>
+
+```{r warning = FALSE, message = FALSE, echo=FALSE}
+
+lyon_time_filtered <- lyon_corpus %>% 
+  filter(Year >= 1907) %>% 
+  filter(Year <= 1941)
+
+```
+
+## Longueur des textes
+
+Il peut être utile d'examiner la longueur des articles pour repérer d'éventuelles anomalies (textes très longs ou au contraire très courts), qui résultent parfois de la transformation numérique des sources primaires. 
+
+Différentes unités de mesure sont possibles. On peut utiliser base R pour calculer le nombre de caractères et/ou le package **quanteda** pour calculer le nombre de **tokens** (concernant la notion de token, voir l'aide-mémoire): 
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+library(quanteda)
+
+lyon_corpus <- lyon_corpus %>% 
+  mutate(token = ntoken(Text), 
+         char = nchar(Text))
+
+
+```
+<br>
+La fonction **summary()** suggère de grandes disparités dans la longueur des articles (de 15 à + 20000 tokens) : 
+```{r warning = FALSE, message = FALSE}
+
+summary(lyon_corpus$token)
+
+```
+
+
+<br>
+On peut visualiser la distribution globale sous forme d'histogramme : 
+
+```{r warning = FALSE, message = FALSE}
+
+p <- lyon_corpus %>% 
+  ggplot(aes(x=token)) +
+  geom_histogram(binwidth = 5) +
+  labs(title = "Length of articles in the Lyon corpus", 
+       x = "Tokens",
+       y = "Frequency")
+
+library(plotly)
+ggplotly(p)
+
+# focus sur les densités les plus fortes  
+
+lyon_corpus %>% 
+  filter(token < 5000) %>% 
+  ggplot(aes(x=token)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "Length of articles in the Lyon corpus", 
+       x = "Tokens",
+       y = "Frequency")
+
+
+```
+<br>
+Soyons curieux et allons d'examiner de plus près des exemples d'articles aux deux extrêmes : 
+```{r warning = FALSE, message = FALSE}
+
+# textes les plus longs
+
+lyon_long <- lyon_corpus %>% filter(token > 15000)
+
+lyon_long %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# textes les plus courts
+
+lyon_short <- lyon_corpus %>% filter(token < 20) 
+
+lyon_short %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+<br>
+A un degré plus fin, on peut examiner les variations de longueur selon le genre des articles sous forme de boxplot: 
+```{r warning = FALSE, message = FALSE}
+
+lyon_corpus %>%  
+  ggplot(aes(x= category_group, y = token, fill = category_group)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Length of text by genre", 
+       x = NULL,
+       y = "Tokens",
+       fill = NULL,
+       caption = "Based on ProQuest Chinese Historical Newspapers") 
+
+```
+
+
+## Quizz 
+
+  * Qu'apprend-t-on sur la nature des articles et leur distribution dans le temps ? 
+  * Qu'observe-t-on concernant la taille des textes ? Que peut-on en déduire sur la structure sur notre corpus ? 
+  * Quelles leçons peut-on en tirer pour les analyses ultérieures ?
+
+
+# Analyse du contenu
+
+Nous allons maintenant entrer dans le contenu des textes eux-mêmes. Comme le corpus d'ensemble est très lourd, on a choisi de travailler sur un échantillon afin de réduire la durée des calculs et la taille des résultats. 
+
+Pour les besoins du cours, nous va sélectionner uniquement les articles de fond (catégorie "Article/Feature") et les journaux basés en Chine continentale (on a éliminé le journal hongkongais *South China Morning Post*) : 
+
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+lyon_corpus_sample <- lyon_corpus %>% 
+  filter(category_group == "Feature/Article") %>% 
+  filter(!Source == "South China Morning Post Ltd.")
+
+```
+<br>
+Le sous-corpus qui en résulte contient 1,418 articles s'étalant sur la période 1849 à 1950.
+
+<div class="alert alert-success" role="alert"> 
+**Bon à savoir** 
+
+Si l'on veut constituer un échantillon aléatoire, on peut appliquer la fonction **slice_sample()** du package dplyr et choisir le nombre (n =) ou la proportion du corpus (prop = ) que l'on veut conserver. On applique set.seed() avant pour garantir la reproductibilité : 
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+library(dplyr)
+
+set.seed(123)
+sample_nbr <- lyon_corpus %>% slice_sample(n = 1000)
+sample_nbr
+
+
+set.seed(123)
+sample_prop <- lyon_corpus slice_sample(prop = 0.25)  # 25% des lignes
+sample_prop
+
+```
+</div>
+
+# N-grams
+
+Un **n-gramme** (ou *n-gram* en anglais) est une séquence de n éléments (généralement des mots ou des caractères) extraits d’un texte. Par exemple, un bigramme (2-gramme) correspond à une paire de mots consécutifs, tandis qu’un trigramme (3-gramme) en regroupe trois. Par exemple, dans la phrase « Les étudiants chinois sont arrivés à Lyon hier après-midi.», les bigrammes incluent par exemple « les étudiants », « étudiants chinois ». L'expression "Les étudiants chinois" constitue un trigramme.
+
+L’approche **n-gram** vise à analyser un corpus en décomposant les textes en séquences de n unités contiguës (mots ou caractères), afin d’identifier par exemple les combinaisons les plus fréquentes (cooccurrences) ou les *patterns* linguistiques ou stylistiques.
+
+Cette méthode est **quantitative et statistique** : elle repose sur le comptage des occurrences des n-grammes dans l’ensemble du corpus, ce qui permet de dégager des tendances, comparer des textes entre eux, ou encore entraîner des modèles de langage.
+
+Google a popularisé l’usage des n-grammes à grande échelle avec son projet [Google Books Ngram Viewer](https://books.google.com/ngrams/), qui permet d’analyser l’évolution diachronique de millions de séquences de mots dans un immense corpus de livres numérisés, ouvrant ainsi la voie à une approche quantitative de l’histoire culturelle et linguistique.
+
+<div class="alert alert-danger" role="alert">
+**Note:** cette approche rencontre des limites et a fait l'objet de critiques, dont les principales sont résumées ci-dessous :
+
+  1. **Perte du contexte syntaxique et sémantique.** Les n-grammes reposent uniquement sur la cooccurrence linéaire de mots, sans prise en compte de la syntaxe, de la grammaire ou du sens profond. Ils ne permettent donc pas d'interpréter les nuances de sens, les figures de style ou les relations complexes entre termes (Baroni et al., 2010).
+   2. **Biais du corpus.** Le corpus Google Books, bien qu’immense, est biaisé : il est dominé par des publications académiques ou occidentales, souvent anglo-saxonnes, avec une sous-représentation de certaines langues, genres ou traditions éditoriales. Cela limite la représentativité des résultats (Pechenick et al., 2015).
+   3. **Nettoyage et métadonnées problématiques.** De nombreuses erreurs ont été relevées dans la qualité des métadonnées (dates incorrectes, éditions mal classées) ainsi que dans l’OCR (reconnaissance optique des caractères), affectant la fiabilité des analyses (Michel et al., 2011).
+   4. **Illusion de scientificité.** Certains critiques ont dénoncé une forme de « scientisme lexical », où l’abondance de données chiffrées donne une illusion de rigueur, alors que les interprétations peuvent être fragiles, voire arbitraires si elles ne sont pas croisées avec des analyses qualitatives ou historiques (Nunberg, 2011).
+   5. **Effet d'échelle et granularité.** L’approche favorise les tendances globales mais masque les usages locaux, minoritaires ou ambigus. Elle est peu adaptée à l’étude de textes courts, à la variation pragmatique ou aux phénomènes discursifs (Underwood, 2019).
+</div>    
+
+## Tokenisation
+
+Avant de pouvoir procéder à l'analyse à base de *n-gram*, il est nécessaire au préalable de segmenter nos textes en mots (on appelle cette opération "tokénisation"). Plusieurs packages permettent cette opération (voir la liste dans l'aide-mémoire). On choisit ici d'utiliser le package **tidytext** qui s'aligne avec l'approche "tidy" qu'on a adoptée depuis le début du cours : 
+
+```{r warning = FALSE, warning = FALSE, eval = FALSE}
+
+library(tidytext)
+
+data("stop_words")
+
+lyon_token <- lyon_corpus_sample %>% 
+  unnest_tokens(output = word, input = Text) %>% 
+  anti_join(stop_words) 
+
+lyon_token %>% 
+  group_by(word) %>% 
+  count(sort = TRUE)
+
+
+```
+<br> 
+**Explications**
+
+  * **unnest_tokens(output = word, input = Text) : la fonction **unnest_tokens()** du package tidytext "déplie" (unnest) le texte en unités lexicales (tokens), souvent des mots. 
+  * **input = Text** : colonne contenant le texte brut à tokenizer.
+  * **output = word** : nouvelle colonne qui contiendra les mots extraits.
+
+**Résultat** : le corpus passe d’un tableau avec des textes complets à un tableau où chaque ligne = un mot.
+
+  * **anti_join(stop_words)** 
+  * **stop_words** est une table prédéfinie de mots vides (comme "le", "la", "et", "de", "the", "is", etc.), fournie par tidytext.
+  * **anti_join()** enlève de notre corpus tokenisé toutes les lignes dont le mot se trouve aussi dans **stop_words**.
+
+**Résultat** : on conserve seulement les mots significatifs.
+
+<div class="alert alert-primary" role="alert">  
+**Questions**
+
+  1. Quel est le nombre total de *tokens* dans notre corpus ? 
+  2. Combien de tokens uniques contient le corpus ? 
+  3. Examiner la liste des tokens : quelles observations pouvez-vous en tirer ? 
+</div> 
+
+## Fréquences
+
+Un petit nettoyage s'impose pour ne conserver que les tokens les plus pertinents sur le plan sémantique. On élimine ci-dessous les chiffres et les mots qui n'existent pas (résultant souvent d'erreurs d'OCR) : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_token_count <- lyon_token_count %>%  
+  filter(nchar(word) > 3) %>% 
+  filter(!str_detect(word, '[0-9]{1,}')) %>% 
+  filter(!word %in% c("tion", "tions", "ment")) %>% 
+  filter(n>1)
+
+```
+<br>
+**Explications**
+
+On élimine les "non-mots" résiduels dans notre corpus tokenisé pour ne conserver que les mots les plus significatifs : 
+  * **filter(nchar(word) > 3)** : on ne garde que les mots de plus de 3 lettres. L'objectif : éliminer les mots trop courts (souvent des erreurs d'OCR).
+  * **filter(!str_detect(word, '[0-9]{1,}'))**  : on élimine les mots qui contiennent des chiffres : str_detect() (package stringr) cherche une correspondance regex. Ici : '[0-9]{1,}' = au moins un chiffre dans le mot. Le ! = négation → on exclut tous les mots qui contiennent des chiffres. Exemple : "street19", "1932" seront supprimés.
+  * **filter(!word %in% c("tion", "tions", "ment"))** : on supprime explicitement les mots "tion", "tions" et "ment" (souvent des mots coupés en bout de colonnes). %in% teste l’appartenance à une liste.  
+  * filter(n>1) : on conserve uniquement les mots dont la fréquence est supérieure à 1 (on élimines les *hapax*, i.e. les mots qui n’apparaissent qu’une seule fois).
+
+En quelques lignes de code, on obtient une liste relativement propre des termes présents dans le corpus avec leur fréquence respective. Nous pouvons utiliser cette liste propre pour éliminer les termes indésirables de notre corpus tokénisé : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_token_filtered <- lyon_token %>% 
+  filter(word %in% lyon_token_count$word)
+
+```
+<br>
+On peut également visualiser les termes et leurs fréquences relatives sous forme de nuage de mots (très *fancy* mais en réalité peu informatifs...) : 
+```{r message = FALSE, warning = FALSE}
+
+library(wordcloud2)
+
+wordcloud2(lyon_token_count, size = 2, backgroundColor = "grey", color = "random-light")
+
+```
+<br>
+L'analyse lexicale fondée sur la fréquence absolue des termes présente des limites. Cette mesure reflète uniquement le nombre de fois qu’il apparaît dans un corpus, sans tenir compte de son importance relative ou de sa spécificité. Cela favorise les mots fréquents mais peu informatifs (comme les mots-outils).
+
+Pour surmonter cette limite, on peut recourir à différentes mesures, comme la fréquence relative, le maximum de vraisemblance (*log-likelihood*) ou la mesure *tf-idf* (term frequency-inverse document frequency), qu'on va mettre en oeuvre dans la section suivante. 
+
+## Tf-idf 
+
+La mesure *tf-idf*  pondère la fréquence d’un terme en fonction de sa rareté dans l’ensemble du corpus, ce qui permet de mettre en valeur les mots plus discriminants et significatifs pour l’analyse. Cette une mesure relative et contextualisée, qui se calcule par rapport à une unité d'ensemble (document, titre, genre, période, etc.). Par exemple, ci-dessous on choisit de calculer les fréquences relatives à l'intérieur de chaque journal (on rapporte la fréquence pour chaque terme par rapport à l'ensemble du vocabulaire dans ce journal précis) : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_token_source_tfidf <- lyon_token_filtered %>%
+  count(Source, word) %>%
+  bind_tf_idf(word, Source, n) %>%
+  arrange(desc(tf_idf))
+
+```
+<br>
+Comparons les fréquences à travers les différents journaux pour faire émerger les termes  spécifiques à chaque journal : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_token_source_tfidf %>% 
+  group_by(Source) %>%
+  top_n(10, tf_idf) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, tf_idf)) %>%
+  ggplot(aes(tf_idf, word, fill = Source)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ Source, scales = "free", ncol=3) +
+  labs(x = "tf-idf", y = "word", 
+       title = "Highest tf-idf terms in the Lyon corpus", 
+       subtitle = "tf-idf by source", 
+       caption = "Based on ProQuest \"Chinese Newspapers Collection\"")
+
+```
+
+
+## Bigrams
+
+Jusqu'ici, on s'en est tenu au niveau individuel du mot, ce qui présente des limites, car on l'isole de son contexte. Nous allons maintenant voir comment constuire des bigrams (la même approche peut être appliquée pour des trigrammes ou plus). La fonction est la même que pour la tokenisation simple, il suffit de changer le nombre *n* de tokens désiré (2 pour des bigrams, 3 pour des trigrams, etc) : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_bigram_filtered <- lyon_token %>% 
+  unnest_tokens(output = bigram, 
+                input = Text, 
+                token = "ngrams", 
+                n = 2)
+
+lyon_bigram_filtered %>% group_by(bigram) %>% count(sort = TRUE)
+
+```
+<br>
+Comme pour les *unigrammes*, on s'aperçoit en inspectant les résultats qu'un nettoyage est nécessaire afin de ne conserver que les bigrams les plus significatifs. L'opération s'effectue en trois étapes : 
+
+  1. On éclate d'abord les bigrammes pour traiter séparer chaque terme qui les constitue. 
+  2. On utilise la liste de termes que nous avons établie précédemment pour éliminer les termes non pertinents. 
+  3. On reconstitue les bigrammes à partir des termes. 
+  
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+
+# Etape 1 : séparation
+
+lyon_bigram_sep <- lyon_bigram %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+# Etape 2 : filtrage
+
+lyon_bigram_filtered <- lyon_bigram_sep %>% 
+  filter(word1 %in% lyon_token_count$word) %>% 
+  filter(word2 %in% lyon_token_count$word)
+  
+
+# Etape 3 : réunification
+
+lyon_bigram_reunited <- lyon_bigram_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+```
+<br>
+Inspectons les résultats:
+```{r message = FALSE, warning = FALSE}
+
+lyon_bigram_reunited %>% 
+  group_by(bigram) %>% 
+  count(sort = TRUE)
+
+```
+<br> 
+Comme pour les unigrammes, la fréquence absolue présente des limites. Les mesures alternatives de fréquence relative introduites précédemment peuvent être appliquées de la même manière aux bigrammes : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_bigram_source_tfidf <- lyon_bigram_reunited %>%
+  count(Source, bigram) %>%
+  bind_tf_idf(bigram, Source, n) %>%
+  arrange(desc(tf_idf))
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_bigram_source_tfidf %>% 
+  group_by(Source) %>%
+  top_n(10, tf_idf) %>%
+  ungroup() %>%
+  mutate(bigram = reorder(bigram, tf_idf)) %>%
+  ggplot(aes(tf_idf, bigram, fill = Source)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ Source, scales = "free", ncol=3) +
+  labs(x = "tf-idf", y = "bigram", 
+       title = "Highest tf-idf bigrams in the Lyon corpus", 
+       subtitle = "tf-idf by source", 
+       caption = "Based on ProQuest \"Chinese Newspapers Collection\"")
+
+```
+<br>
+## Du n-gram au contexte 
+
+Bien que plus informative que l’analyse unigramme au niveau du mot, l’analyse des mots adjacents reste limitée : elle ne fournit qu’une vision étroite du contexte linguistique. Pour élargir cette perspective, d’autres approches peuvent être mobilisées, notamment l’analyse par **concordance**, qui permet d’observer un mot choisi dans son environnement syntaxique immédiat, selon une fenêtre contextuelle définie par le chercheur (c'est pourquoi on appelle aussi cette méthode **KWIC**, i.e. keyword in context). Cette méthode relève principalement d’une démarche qualitative fondée sur une lecture attentive (*close reading*), ce qui la rend précieuse pour l’interprétation fine des usages, mais difficilement généralisable et peu adaptée à une analyse à grande échelle. L'approche par concordance peut donc être avantageusement complétée par des méthodes quantitatives fondées sur l’analyse de **co-occurrences** dans un contexte élargi — phrase, paragraphe, ou document entier — dont l’étendue est paramétrable selon le niveau de granularité recherché. Ces approches permettent de détecter des régularités d’association lexicales plus globales, souvent invisibles à l’échelle micro, et offrent des perspectives complémentaires entre contextualisation fine et modélisation des tendances d’usage.
+
+# Concordance 
+
+On choisit d'examiner le terme clé "lyon". On propose deux approches avec deux packages différents : (1) la première avec le package *histtext* (2) la deuxième avec **quanteda**.
+
+## Avec HistText
+```{r message = FALSE, warning = FALSE, eval=FALSE}
+
+lyon_conc1 <- search_concordance_on_df(lyon_corpus_filtered, 
+                                 query = "lyon", 
+                                 context_size = 30,
+                                 search_column = "Text",
+                                 id_column = "DocId",
+                                 space_is_word_sep = FALSE,
+                                 use_regexp = FALSE,
+                                 case_sensitive = FALSE)
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_conc1 
+
+```
+
+
+## Avec Quanteda
+
+L'inconvénient du package quanteda est qu'il requiert de transformer au préalable notre dataframe en objet "corpus" pour le rendre traitable par ses différentes fonctions : 
+```{r message = FALSE, warning = FALSE, eval=FALSE}
+
+lyon_quanteda <- corpus(lyon_corpus_filtered, text_field = "Text", docid_field = "DocId")
+
+lyon_quanteda_tokens <- tokens(lyon_quanteda)
+
+lyon_conc2 <- kwic(lyon_quanteda_tokens, pattern = "lyon", window = 30)
+
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_conc2
+
+```
+<br>
+
+<div class="alert alert-danger" role="alert">
+**Questions:** 
+  
+  * Les résultats sont-ils les mêmes ? Comment l'expliquer ?
+  * Quelle méthode vous semble préférable ? (Justifier en fonction de vos besoins)
+</div> 
+
+# Co-occurrences
+
+L’analyse de co-occurrences est une méthode d’exploration textuelle qui consiste à repérer et à quantifier les apparitions simultanées ou proches de deux termes (ou plus) dans un corpus. Ces co-apparitions peuvent être mesurées soit dans une même unité textuelle (phrase, paragraphe, ou document) ou à une distance définie (par exemple, dans une fenêtre de *n* mots autour d’un terme donné). L’objectif est de détecter des liens sémantiques ou discursifs potentiels entre des mots, en révélant des réseaux de termes souvent associés. Cette méthode est très utilisée en lexicométrie, analyse du discours, fouille de textes, etc. 
+
+Dans cette section, on va voir comment utiliser le package **quanteda** pour identifier et analyser des co-occurrences. D'autres approches sont possibles mais quanteda est l'un des packages les plus robustes pour ce genre d'analyse quantitative. Comme on le verra, il peut être combinée avec d'autres approches (tidy) pour filtrer et visualiser les résultats. 
+
+La recherche des co-occurrences avec **quanteda** requiert plusieurs opérations préalables :  
+
+## Prétraitement
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(quanteda)
+
+# Création de l'object corpus requis par quanteda
+
+lyon_quanteda <- corpus(lyon_corpus_filtered, text_field = "Text", docid_field = "DocId")
+
+# Tokenisation et nettoyage (minuscules, sans ponctuation, sans stopwords)
+
+lyon_quanteda_tokens <- tokens(lyon_quanteda,
+               remove_punct = TRUE,
+               remove_symbols = TRUE,
+               remove_numbers = TRUE) %>%
+  tokens_tolower() %>%
+  tokens_remove(stopwords("en")) %>% # Utilise stopwords en anglais
+  tokens_select(pattern = "\\d", selection = "remove", valuetype = "regex") %>%
+  tokens_select(pattern = "^.{1,3}$", selection = "remove", valuetype = "regex") 
+
+```
+<br>
+
+**Explication ligne à ligne** 
+
+On utilise la fonction **corpus()** pour transformer notre dataframe filtré (lyon_corpus_filtered) pour le rendre traitable par quanteda. On spécifie la colonne qui contient le texte brut (Text) et la colonne avec l'identifiant unique de chaque document (DocId ().
+
+La fonction **tokens()** segmente le corpus en tokens. Elle applique plusieurs opérations de nettoyage au moment de la tokenisation (optionnelles) : 
+
+  * **(remove_punct = TRUE)**	: Supprime la ponctuation (virgules, points, etc.)
+  * **(remove_symbols = TRUE)**	: Supprime les symboles non alphabétiques (@, #, €, etc.)
+  * **(remove_numbers = TRUE)**	: Supprime les nombres composés uniquement de chiffres (2023, 18, etc.) 
+
+Les lignes suivantes servent à normaliser et éliminer les résidus non désirables : 
+
+  * **tokens_tolower()** : convertit tous les tokens en minuscules, pour éviter que "Lyon" et "lyon" soient considérés comme deux mots différents.
+  * **tokens_remove(stopwords("en"))** : supprime les mots vides en anglais. Pour connaître la liste des langues disponibles et leur code, voir la [documentation dédiée](?stopwords_getlanguages).
+  * **tokens_select()** : sert à sélectionner (selection = "keep") ou supprimer (selection = "remove") tous les mots qui correspondent à un motif précis et selon une méthode prédéfinie. En l'occurrence, on utilise une expression régulière (valuetype = "regex") pour supprimer deux motifs précis : les chiffres (pattern = "\\d"...) et les mots qui contiennent moins de 4 caractères (pattern = "^.{1,3}$"...). 
+
+**(pattern = "\\d"...)** : supprimer les chiffres (d = digits)
+
+| Élément                | Signification                                      |
+| ---------------------- | -------------------------------------------------- |
+| `\\d`                  | correspond à **un chiffre** (regex standard)       |
+| `valuetype = "regex"`  | indique qu’on utilise une **expression régulière** |
+| `selection = "remove"` | on supprime les mots correspondants                |
+
+**(pattern = "^.{1,3}$"...)** : supprimer les mots de mots courts (1 à 3 charactères)
+
+| Élément                | Signification                     |
+| ---------------------- | --------------------------------- |
+| `^` et `$`             | début et fin du mot               |
+| `.`                    | n’importe quel caractère          |
+| `{1,3}`                | de 1 à 3 caractères           |
+| `selection = "remove"` | on retire les mots correspondants |
+
+Une expression régulière (ou regex) est un motif textuel utilisé pour rechercher, identifier ou manipuler des chaînes de caractères selon des règles précises (comme des motifs de lettres, chiffres, longueurs, etc.). Concernant les expressions régulières, voir la [cheat sheet](https://evoldyn.gitlab.io/evomics-2018/ref-sheets/R_strings.pdf) dédiée. 
+
+## Construire les matrices
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# Créer d'une matrice de co-occurrence dans une fenêtre de 5 mots
+
+fcmat <- fcm(lyon_quanteda_tokens, context = "window", window = 5)
+
+```
+<br>
+
+**Explication**: une **FCM (matrice de co-occurrence, en anglais *frequency co-occurrence matrix*)** indique combien de fois deux mots apparaissent ensemble dans un même contexte (ex. : même fenêtre de 5 mots, même phrase, etc.). Sous forme tabulaire, cela donne : 
+
+|      | mot1 | mot2 | mot3 | … |
+| ---- | ---- | ---- | ---- | - |
+| mot1 | –    | 5    | 2    | … |
+| mot2 | 5    | –    | 4    | … |
+| mot3 | 2    | 4    | –    | … |
+| …    | …    | …    | …    | … |
+
+## Explorer les co-occurrences 
+
+Convertir la matrice (fcm) en dataframe avec la fonction **tidy()** du package **tidytext** : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(dplyr)
+library(tidytext)
+
+cooc_df <- tidy(fcmat) %>% rename(term1 = document, term2 = term)
+
+```
+<br>
+Trier les paires par ordre de fréquence : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+cooc_df %>% arrange(desc(count))  
+
+```
+
+## Filtrer
+
+Cette étape est optionnelle mais conseillée pour la visualisation qui suit. Plusieurs méthodes sont possibles. Nous proposons ici de filtrer à partir de la fréquence des termes en utilisant *quanteda* et sa suite **quanteda.textstats**. 
+
+La première étape consiste à créer une matrice document-terme pour obtenir les fréquences des mots : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# Créer une matrice document-terme pour obtenir les fréquences des mots (optionnel)
+
+dfm_mat <- dfm(lyon_quanteda_tokens)
+
+# Extraire les mots les plus fréquents avec textstat_frequency() 
+
+library(quanteda.textstats)
+
+freq <- textstat_frequency(dfm_mat)
+top_feat <- freq$feature[1:30]
+
+fcmat_trimmed <- fcm_select(fcmat, pattern = top_feat, selection = "keep")
+
+```
+<br>
+**Explication** : une **DFM (matrice document-terme, en anglais *document frequency matrix*)** indique combien de fois un mot apparaît dans chaque document.Elle structure le corpus sous forme tabulaire :
+
+|      | mot1 | mot2 | mot3 | … |
+| ---- | ---- | ---- | ---- | - |
+| doc1 | 2    | 0    | 1    | … |
+| doc2 | 1    | 3    | 0    | … |
+| …    | …    | …    | …    | … |
+<br>
+On peut ensuite extraire les mots les plus fréquents avec la fonction **textstat_frequency()** fournie par le package **quanteda.textstats**. 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(quanteda.textstats)
+
+freq <- textstat_frequency(dfm_mat)
+top_feat <- freq$feature[1:30]
+
+fcmat_trimmed <- fcm_select(fcmat, pattern = top_feat, selection = "keep")
+
+```
+<br> 
+Ici, on a choisi de filtrer les 30 termes les plus fréquents, mais vous pouvez modifier à votre guise. 
+
+## Visualiser 
+
+On peut ensuite visualiser sous forme de graphe les co-occurrences sélectionnées. Deux options s'offrent à nous : les fonctions de visualisation inclues dans la suite quanteda ou le package **igraph** et ses associés (**ggraph** et **tidygraph**). 
+
+### Avec quanteda
+
+La fonction **textplot_network()** du package **quanteda.textplots** permet de projeter directement la matrice sous forme de graphe : 
+
+```{r message = FALSE, warning = FALSE}
+
+library(quanteda.textplots)
+
+textplot_network(fcmat_trimmed, 
+                 min_freq = 1, 
+                 edge_alpha = 0.1, 
+                 edge_size = 5,
+                 edge_color = "purple",
+                 vertex_labelsize = log(rowSums(fcmat_trimmed))*0.7)
+
+```
+
+
+### Avec igraph 
+
+Avec **igraph**, la première étape consiste à convertir en graphe la matrice réduite (fcmat_trimmed) grâce à la fonction **graph_from_adjacency_matrix()** fournie par le package **igraph** : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(igraph)
+
+graph2 <- fcmat_trimmed %>%
+  as.matrix() %>%
+  graph_from_adjacency_matrix(mode = "undirected", weighted = TRUE, diag = FALSE)
+
+```
+<br>
+Ensuite, on projette le graphe en utilisant les fonctions de visualisations fournies par les **ggraph** et **tidygraph** : 
+```{r message = FALSE, warning = FALSE}
+
+library(ggraph)
+library(tidygraph)
+
+set.seed(123)
+ggraph(as_tbl_graph(graph1), layout = "fr") +
+  geom_edge_link(aes(width = count), alpha = 0.2) +
+  geom_node_point(color = "purple", size = 4) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 4) +
+  theme_void() +
+  ggtitle("Réseau de co-occurrences (fenêtre = 5 mots)")
+
+```
+<br>
+<div class="alert alert-success" role="alert"> 
+Noter que la grammaire est très similaire à celle de ggplot2 (cette grammaire est commune à tous les packages qui s'appuie sur la logique *tidy*). Nous verrons plus en détail dans la prochaine séance comment construire et analyser un réseau avec **igraph** et packages associés. </div>
+
+
+# Topic modeling
+
+La modélisation de thème avec le package **stm** (structural topic modeling) implique de suivre plusieurs étapes successives: 
+
+  1. **Sélection des métadonnées** qu'on souhaite intégrer dans l'analyse des topics (si des métadonnées sont disponibles). 
+  2. **Prétraitement du corpus à modéliser** : cela implique de faire des choix pour garantir la qualité des topics obtenus. Par exemple, faut-il "raciniser" et "lemmatiser" les termes, quels termes doit-on enlever pour cause de fréquence, quelle longueur et fréquence minimale ? Cette étape est cruciale car les choix qui sont faits pour la préparation du texte à modéliser ont un impact sur les topics détectés. On est souvent amenés à revenir à cette étape pour raffiner la préparation et enlever les éventuelles sources de bruit qui sont apparus après une première exploration. 
+  3. **Construction du ou des modèle(s)** : ceci implique notamment de choisir *a priori* combien de topics on souhaite obtenir et d'intégrer les métadonnées (*covariates*) dont on souhaite éventuellement étudier l'influence sur les thèmes obtenus (par exemple, la période de publication, la source, le genre de l'article, l'auteur(e) si cette donnée est disponible).
+  4. **Exploration** et **Validation**: Explorer et visualiser les topics obtenus à l'aide des outils fournis par le package. Examiner de près un échantillon représentatif d'articles pour chaque topic, afin de valider (ou invalider) les topics obtenus, et éventuellement revenir à l'étape 2 pour affiner le prétraitement du corpus. 
+  
+## 1. Sélection des métadonnées
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+meta <- lyon_corpus_filtered %>% select(DocId, Year, Source, Title)
+
+```
+## 2. Prétraitement du corpus
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+corpus <- stm::textProcessor(lyon_corpus_filtered$Text,
+                             metadata = meta, 
+                             stem = FALSE, 
+                             wordLengths = c(4, Inf), 
+                             removestopwords = TRUE,
+                             customstopwords = c("lyon", "lyons"),
+                             verbose = FALSE)
+
+```
+
+Explications ligne à ligne: 
+
+  * la fonction **textProcessor()** construire un *objet corpus* requis pour le topic modeling avec **stm**
+  * **lyon_corpus$Text**: le premier argument indique la source du texte à modéliser. 
+  * les arguments suivants indiquent les choix de prétraitement du texte. Par exemple ici, on choisit de ne pas "raciniser" (stem = FALSE), i.e. opération qui consiste à ne réduire les mots à leur racine (cf. aide-mémoire). On choisit également de ne conserver que les mots d'une longueur supérieure à 3 caractères. Enfin on élimine tous les mots trops fréquents (stopwords) à partir d'une liste prédéfinie, ainsi que les mots-clés utilisés pour la requête d'origine (ici, "lyon" et "lyons"). En effet, la méthode LDA reposant sur un modèle statistique de cooccurrence et de fréquence des mots, la présence de termes trop fréquents risque d’introduire du bruit, voire de masquer des mots moins fréquents mais potentiellement plus discriminants pour l’identification des thématiques.   
+  * **verbose = FALSE** : purement technique, sert à désactiver l’affichage des messages ou détails intermédiaires lors de l’exécution de la fonction. 
+  
+La fonction **plotRemoved()** et les trois graphiques qu'elle produit aident à déterminer le seuil de fréquence minimale pour enlever les sources de bruit et obtenir un corpus équilibré (opération facultatice mais conseillée). Ici, d'après les plots, il est recommendé de fixer le seuil à 5. Autrement dit, les termes doivent apparaître au moins 5 fois dans le corpus pour être conservé dans la construction des topics. Tous les termes rares qui apparaissent moins de 4 fois sont supprimés. 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+stm::plotRemoved(corpus$documents, lower.thresh = c(0,10, by=5))
+
+```
+<br> 
+La fonction **prepDocuments()** finalise la préparation du corpus en intégrant tous les éléments précédents : articles source (documents), champ lexical après épuration des termes trop rares ou trop fréquents (vocab), métadonnées d'origine (meta), seuil minimal d'occurrences (5). Le résultat est un objet de type liste (out). 
+
+<div class="alert alert-danger" role="alert"> 
+Important à retenir : ne pas modifier la terminologie employé par les créateurs du package stm (corpus, out, documents, vocab, meta), cela risquerait de créer des dysfonctionnements.</div>  
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+out <- stm::prepDocuments(corpus$documents, 
+                          corpus$vocab, 
+                          corpus$meta, 
+                          lower.thresh = 5) 
+
+```
+<br>
+<div class="alert alert-success" role="alert"> 
+A l'issue de cette fonction, un message nous renseigne sur les termes du corpus pour cause de fréquence. Attention à bien comprendre : cela ne signifie pas que les termes ont été physiquement supprimés de notre jeu de données d'origine. Cela signifie simplement qu'ils ne seront pas pris en compte dans la modélisation de thème (le terme "corpus" ici est à prendre au sens technique de l'objet corpus requis par le package stm). Le message informe également sur les documents éventuellement éliminés lors du prétraitement pour cause de fréquence. Ici, aucun document n'a été éliminé. Sur la différence entre term et token, voir l'aide-mémoire.</div> 
+
+## 3. Construction du modèle 
+
+La sélection du nombre de topics *k* reste une question ouverte. Le package *stm* fournit différents outils statistiques pour vous aider à déterminer le nombre optimal de topics en fonction de la taille et la structure de votre corpus, mais *in fine*, le modèle idéal est celui qui vous fournit des résultats interprétables et utile à votre analyse. ^[Selon les créateurs du package [stm package](https://cran.r-project.org/web/packages/stm/stm.pdf), pour les corpus de taille moyenne voire petite en SHS, allant de quelques centaines à quelques milliers de documents, the nombre optimal de topics oscille entre 5 and 50. Voir Margaret Roberts et al., “Stm: Estimation of the Structural Topic Model,” September 18, 2020, 64–65, https://CRAN.R-project.org/package=stm].
+
+La fonction *searchK()* fournit un différentes métriques pour guider le choix du nombre optimal de topics. Les résultats peuvent être visualisés avec la fonction plot(kresult): 
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+set.seed(2025)
+K<-seq(5,50, by=10) 
+kresult <- searchK(out$documents, out$vocab, K, data=out$meta, prevalence =~ Year + Source, verbose=FALSE)
+plot(kresult)
+
+```
+<br>
+**Définitions** (pour plus de détails, voir la documentation du [package stm](https://www.structuraltopicmodel.com/))
+
+  * **held-out likelihood**: évalue la capacité prédictive du modèle sur des données non utilisées à l’entraînement ; 
+  * **residual**: les résidus mesurent les écarts entre les cooccurrences de mots observées et celles prévues par le modèle, et signalent un éventuel sous-ajustement ; 
+  * **semantic coherence**: la cohérence sémantique indique dans quelle mesure les mots les plus probables d’un topic apparaissent ensemble dans les documents, ce qui facilite leur interprétation ;  
+  * **exlusivity**: l’exclusivité mesure le caractère distinctif du vocabulaire associé à chaque topic, en montrant à quel point ses mots sont spécifiques. 
+  * **lower bound**: la borne inférieure (lower bound) de la vraisemblance est utilisée pour suivre la convergence de l’algorithme d’estimation.
+
+<div class="alert alert-success" role="alert"> 
+Conseil : rien n'interdit de construire plusieurs modèles avec un nombre de topics différents et de comparer les résultats. Cela permet aussi de naviguer entre différents niveaux de granularité. Attention la construction des modèles peut prendre du temps selon la taille du corpus.</div>
+
+Ci-dessous, on propose de construire trois modèles avec 10, 20, et 40 topics:
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# 10-topic model
+mod.10 <- stm::stm(out$documents, 
+                   out$vocab, K=10, 
+                   data=out$meta, 
+                   prevalence =~ Year + Source, 
+                   verbose = FALSE)
+
+# 20-topic model
+mod.20 <- stm::stm(out$documents, 
+                   out$vocab, K=20, 
+                   data=out$meta, 
+                   prevalence =~ Year + Source,  
+                   verbose = FALSE)
+
+# 40-topic model
+mod.40 <- stm::stm(out$documents, 
+                   out$vocab, K=40, 
+                   data=out$meta, 
+                   prevalence =~ Year + Source,  
+                   verbose = FALSE)
+
+
+```
+
+<br> 
+
+Ensuite, on intègre dans les métadonnées dont on souhaite évaluer l'influence, en utilisant la fonction **estimateEffect()** (cette étape est facultative) : 
+
+**Année de publication**
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+year10 <- stm::estimateEffect(1:10 ~ Year, mod.10, meta=out$meta)
+year20 <- stm::estimateEffect(1:20 ~ Year, mod.20, meta=out$meta)
+year40 <- stm::estimateEffect(1:40 ~ Year, mod.40, meta=out$meta)
+
+```
+**Source**
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+source10 <- stm::estimateEffect(1:10 ~ Source, mod.10, meta=out$meta)
+source20 <- stm::estimateEffect(1:20 ~ Source, mod.20, meta=out$meta)
+source40 <- stm::estimateEffect(1:40 ~ Source, mod.40, meta=out$meta)
+
+```
+
+<div class="alert alert-success" role="alert"> 
+A ce stade, il est conseillé de sauvegarder l'environnement sous forme d'un fichier image (.RData) pour éviter d'avoir à refaire tous les calculs si votre ordinateur crashe ou si vous devez reprendre votre travail plus tard. Ce fichier image sera également nécessaire si vous souhaitez utiliser l'interface stminsights introduite dans la section suivante.</div>
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+save.image("mytopics.RData")
+
+```
+
+## 4. Exploration/Validation
+
+### Avec l'interface stminsights
+
+Dans un premier temps, il est conseillé d'utiliser le package **stminsights** qui fournit une interface agréable pour faciliter l'exploration des topics obtenus et comparer les différences modèles construits. Après avoir ouvert l'application, chargez le fichier image (RData) qui contient votre modèle ou vos différents modèles.
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+library(stminsights)
+run_stminsights()
+
+```
+<br>
+Dans les sections suivantes, nous allons voir comment coder pour reproduire et ajuster les sorties générées par l’application stminsights. 
+
+### Proportions de topics par document *θ*
+
+Le package stm stocke les proportions document-topic et les distributions topic-mot dans deux matrices, θ (également désignée, de manière quelque peu déroutante, par γ) et β.
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+plot.STM(mod.10, "hist")
+plot.STM(mod.20, "hist")
+plot.STM(mod.40, "hist")
+
+```
+
+Nous pouvons ensuite examiner de plus près la matrice θ, qui peut être appelée directement à partir du modèle. Il est cependant possible – et peut-être plus pratique – d’utiliser la fonction intégrée **make.dt().** Cette dernière permet d’intégrer les métadonnées, ce qui est particulièrement utile dans notre cas puisque nous cherchons à analyser l’influence de la date de publication sur la prévalence des topics.
+
+Les dataframes ci-dessous affichent les proportions de topics pour chaque document, accompagnées de leurs métadonnées (un tableau pour chaque modèle) : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+topicprop10<-make.dt(mod.10, meta)
+topicprop20<-make.dt(mod.20, meta)
+topicprop40<-make.dt(mod.40, meta)
+
+```
+
+### Fréquences des termes par topic *β*
+
+```{r warning = FALSE, message = FALSE}
+
+plot.STM(mod.10, "summary")
+plot.STM(mod.20, "summary")
+plot.STM(mod.40,"summary")
+
+```
+<br>
+
+On peut aussi visualiser les termes sous forme de nuage de mots grâce la fonction **cloud()**
+
+```{r warning = FALSE, message = FALSE}
+
+cloud(mod.20, topic = 3)
+
+```
+<br>
+Pour modifier la taille du nuage et juxtaposer deux nuages, vous pouvez utiliser le code suivant (modifiez les marges et l'échelle à votre guise) : 
+
+```{r}
+par(mfrow=c(1,2), mar=c(0,0,2,2))
+cloud(mod.20, topic = 3, scale = c(4, 0.4))
+cloud(mod.20, topic = 10, scale = c(4, 0.4))
+
+```
+
+<br>
+Une alternative fondée sur une approche "tidy" (exemple avec le modèle à 10 topics): 
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# charger les packages
+
+library(tidyverse)
+library(tidytext)
+
+# extraire β pour le modèle à 10 topics 
+
+td_beta10 <- tidytext::tidy(mod.10) 
+
+```
+<br>
+Explorons les 10 mots les plus fréquents dans chaque topic: 
+
+```{r warning = FALSE, message = FALSE}
+
+# termes les plus fréquents dans chaque topic
+
+options(repr.plot.width=7, repr.plot.height=8, repr.plot.res=100) 
+
+library(tidyverse)
+library(tidytext)
+
+td_beta10 %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  mutate(topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 2, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(x = NULL, y = expression(beta),
+       title = "Highest word probabilities for each topic",
+       subtitle = "Different words are associated with different topics",
+       caption = "Based on ProQuest Chinese Newspapers Collection")
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+td_beta10_top_words <- td_beta10 %>%
+  group_by(topic) %>%
+  top_n(10, beta) 
+
+td_beta10_top_words %>% arrange(topic, desc(beta))
+
+```
+
+
+### LDAvis
+
+Le package **`stm`** propose une fonction appelée **`LDAvis`**, qui permet de générer une **visualisation interactive** d’un modèle de topics, inspirée des méthodes de la Latent Dirichlet Allocation (LDA). Cet outil est particulièrement utile pour **explorer et interpréter visuellement les topics** extraits du corpus.
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+stm::toLDAvis(mod.10, doc=out$documents)
+stm::toLDAvis(mod.20, doc=out$documents)
+stm::toLDAvis(mod.40, doc=out$documents)
+
+```
+<br>
+La visualisation se compose de deux panneaux principaux :
+
+  * À gauche : la carte des topics: Chaque cercle représente un topic. Le **nombre total de cercles (K) correspond au nombre de topics extraits. La taille de chaque cercle est proportionnelle à l’importance relative du topic dans l’ensemble du corpus (c’est-à-dire la part de tokens qu’il couvre). La **distance entre les cercles** reflète la similarité entre topics. Des cercles proches indiquent des topics partageant un vocabulaire similaire. Des cercles éloignés suggèrent des topics plus distincts.
+  * À droite : le nuage de mots associé à un topic sélectionné: Lorsque vous cliquez sur un cercle (ou utilisez le curseur pour en sélectionner un), un **histogramme s’affiche** pour montrer les mots caractéristiques de ce topic. Pour chaque terme, deux barres sont affichées : Une **barre bleue**, qui indique la **fréquence globale** du mot dans le corpus. Une **barre rouge**, qui représente la **fréquence estimée** du mot **au sein du topic sélectionné**. Cela permet d’identifier les mots **distinctifs**, c’est-à-dire ceux qui sont fréquents dans un topic mais peu courants dans le corpus global.
+
+Par ailleurs, un **curseur** permet d’ajuster le poids donné à la fréquence globale vs. la spécificité des mots pour trier la liste (appelée *relevance*). Vers la gauche (λ proche de 0), les mots sont très spécifiques au topic. Vers la droite (λ proche de 1), on privilégie les mots les plus fréquents dans le topic, même s’ils apparaissent ailleurs.
+
+En résumé, **LDAvis** permet d’explorer interactivement :
+
+1. **La structure globale** des topics (similarités, importance relative),
+2. **Le contenu lexical** de chaque topic (mots caractéristiques),
+3. Et de faire des ajustements pour mieux comprendre les thématiques extraites.
+
+### Corrélations
+
+La fonction permet de visualiser sous formes de graphes les chevauchement entre topics à partir des termes qu'ils partagent. Deux méthodes de calcul sont proposées, simple ou complexe (huge) (pour plus de détails sur ces mesures, voir la documentation du package [**stm**](https://www.structuraltopicmodel.com/).
+
+Exemple avec le modèle à 20 topics: 
+```{r warning = FALSE, message = FALSE}
+
+corrsimple <- topicCorr(mod.20, method = "simple", verbose = FALSE)
+corrhuge <- topicCorr(mod.20, method = "huge", verbose = FALSE)
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+par(mfrow=c(1,2), mar=c(0,0,2,2))
+plot(corrsimple, main = "Simple method")
+plot(corrhuge, main = "Huge method")
+
+```
+
+### Perspectives
+
+Une fois identifiés les topics corrélés, on peut utiliser l'argument **perspective** de la fonction **plot()** pour comparer deux à deux les topics qui nous semblent proches afin de mieux saisir leurs différences : 
+
+```{r warning = FALSE, message = FALSE}
+
+plot(mod.20, type="perspectives", topics=c(3, 10))
+
+```
+
+
+### Citations
+
+Trouver des exemples d'articles représentatifs pour un topic donné : 
+```{r warning = FALSE, message = FALSE}
+
+T10_thoughts1 <- findThoughts(mod.10,texts=lyon_corpus_filtered$Text, topics=1, n=5)$docs[[1]]
+T10_thoughts5 <- findThoughts(mod.10,texts=lyon_corpus_filtered$Text, topics=5, n=5)$docs[[1]]
+T10_thoughts10 <- findThoughts(mod.10,texts=lyon_corpus_filtered$Text, topics=10, n=5)$docs[[1]]
+
+par(mfrow=c(1,3), mar=c(1,1,2,2))
+plotQuote(T10_thoughts1, width=50, maxwidth=400, text.cex=0.5, main="Topic 1")
+plotQuote(T10_thoughts5, width=50, maxwidth=400, text.cex=0.5, main="Topic 5")
+plotQuote(T10_thoughts10, width=50, maxwidth=400, text.cex=0.5, main="Topic 10")
+
+```
+
+## 5. Covariates
+
+On peut enfin estimer l'influence sur les topics des variables sélectionnées lors de l'entraînement des modèles (ici la source et la date de publication). 
+
+### Source
+
+Pour visualiser l'influence de la source (une variable catégorielle) sur un topic choisi, on utilise la fonction **plot.estimateEffect** et la méthode **pointestimate**. Par exemple, dans l'exemple ci-dessous, on examine l'influence de la source sur le topic 19 dans le modèle à 20 topics : 
+```{r warning = FALSE, message = FALSE}
+
+plot.estimateEffect(source10, model=mod.10, covariate="Source", topics= 5, 
+                    method="pointestimate", 
+                    xlim=c(-1,1), width= 30)
+```
+<br>
+Les autres arguents (xlim, width) servent à modifier l'apparence du plot.
+
+### Temps
+
+De même, pour visualiser l'influence du temps (une variable continue), on utilise la fonction **plot.estimateEffect** en choisissant la méthode **continuous**. Par exemple, ci-dessous on visualise l'influence des années sur les 10 premiers topics dans le modèle à 20 topics : 
+```{r warning = FALSE, message = FALSE}
+
+plot.estimateEffect(year10, 
+                    covariate = "Year", 
+                    model = mod.10, 
+                    method = "continuous", 
+                    topics = c(1:5))
+
+```
+
+## 6. Evaluation/Comparaison
+
+Pour comparer la qualité des différents modèles, on peut évaluer la cohérence sémantique des topics par rapport à leur exclusivité (ce code reproduit la visualisation fournie par stminsights) :  
+
+```{r warning = FALSE, message = FALSE}
+
+mod10df<-as.data.frame(cbind(c(1:10),exclusivity(mod.10), semanticCoherence(model=mod.10, out$documents), "PQ10T"))
+mod20df<-as.data.frame(cbind(c(1:20),exclusivity(mod.20), semanticCoherence(model=mod.20, out$documents), "PQ20T"))
+mod40df<-as.data.frame(cbind(c(1:40),exclusivity(mod.40), semanticCoherence(model=mod.40, out$documents), "PQ40T"))
+
+models<-rbind(mod10df, mod20df, mod40df)
+colnames(models)<-c("Topic","Exclusivity", "SemanticCoherence", "Model")
+
+models$Exclusivity<-as.numeric(as.character(models$Exclusivity))
+models$SemanticCoherence<-as.numeric(as.character(models$SemanticCoherence))
+
+
+plotmodels <- ggplot(models, aes(SemanticCoherence, Exclusivity, color = Model))+
+  geom_point(size = 2, alpha = 0.7) + 
+  geom_text(aes(label=Topic), nudge_y=.04)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence", 
+       subtitle = "Lyon ProQuest Corpus")
+
+plotmodels
+
+```
+
+
+
+## Quizz
+
+  1. Quel est selon vous le modèle le plus approprié au corpus choisi ? Pourquoi ? 
+  2. A quoi correspondent les principaux topics identifiés dans le corpus ?
+  3. Certains topics sont-ils spécifiques à certains journaux ou certaines périodes ? 
+
+# Analyse de sentiment
+
+Il existe différentes méthodes et plusieurs dictionnaires permettant d’analyser l’opinion ou les émotions exprimées dans un texte. Le package **textdata** (associé au package **tidytext**) offre un accès à plusieurs lexiques de sentiments. Ces lexiques sont généralement basés sur des unigrammes, c’est-à-dire des mots pris isolément. Ils répertorient de nombreux mots en anglais, chacun étant associé à une polarité (positive ou négative), et parfois à des émotions spécifiques telles que la joie, la colère, la tristesse, etc. Les trois lexiques généralistes les plus couramment utilisés sont :
+
+  * [NRC Emotion Lexicon](https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm) : classe les mots de manière binaire (oui/non) dans les catégories suivantes : positif, négatif, colère, anticipation, dégoût, peur, joie, tristesse, surprise et confiance. Il couvre une quarantaine de langues environ, mais attention : les lexiques pour les langues faiblement dotées sont souvent issus de traductions à partir de l'anglais, et non d'annotations à partir de la langue d'origine.
+   * [bing](https://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html) : attribue également aux mots une classification binaire, mais limitée aux sentiments positifs ou négatifs.
+  * [AFINN](http://www2.imm.dtu.dk/pubdb/pubs/6010-full.html) : associe à chaque mot une note allant de -5 à 5, les scores négatifs reflétant une connotation négative, et les scores positifs une connotation positive.
+  * [Loughran-McDonald](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) : un lexique créé à partir de documents financiers, qui classifie les termes en six catégories : "negative", "positive", "litigious", "uncertainty", "constraining", or "superfluous".
+  
+```{r message = FALSE, warning = FALSE}
+
+library(tidytext)
+library(textdata)
+
+get_sentiments("nrc") %>% 
+  group_by(sentiment) %>% 
+  count(sort = TRUE)
+
+get_sentiments("bing") %>% 
+  group_by(sentiment) %>% 
+  count(sort = TRUE)
+
+get_sentiments("loughran") %>% 
+  group_by(sentiment) %>% 
+  count(sort = TRUE)
+
+get_sentiments("afinn") %>% 
+  ggplot(aes(x=value)) +
+  geom_histogram(bin = 1) 
+
+```
+  
+  
+<div class="alert alert-success" role="alert"> 
+**Bon à savoir**
+
+  * Pour comprendre les usages et les biais des différentes lexiques, il est important de savoir à partir de quelles sources et en suivant quelles méthodes ils ont été constitués. 
+  * D'autres dictionnaires extérieurs au package tidytext peuvent être importés depuis d'autres sources et utilisés dans R. Par exemple, pour le français, le lexique [FEEL](http://advanse.lirmm.fr/feel.php). 
+  * L'analyse de sentiment à base de lexique est une approche possible parmi d'autres. Nous l'avons choisie pour cette séance parce qu'elle relativement facile à mettre en oeuvre par rapport aux méthodes plus sophistiquées et gourmandes en puissance de calcul. (Voir l'aide-mémoire pour un panorama des approches existantes et leurs limites respectives).</div> 
+
+## Choix du lexique 
+
+Pour cette étude spécifique, nous allons utiliser le lexique *bing*. La première étape consiste à joindre le lexique avec notre corpus tokénisé. Avant de faire la jointure, pensez à vérifier que les deux dataframes ont une colonne commune portant le même nom (ici la colonne "word") : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+bing <- get_sentiments("bing")
+
+lyon_bing <- lyon_token_filtered %>%
+  inner_join(bing) 
+
+```
+<br>
+Examinons les termes négatifs : 
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_bing %>% 
+  filter(sentiment %in% c("negative")) %>%
+  group_by(sentiment, word) %>%
+  count(sort = TRUE)
+
+```
+
+<br>
+Examinons les termes positifs : 
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_bing %>% 
+  filter(sentiment %in% c("positive")) %>%
+  group_by(sentiment, word) %>%
+  count(sort = TRUE)
+
+```
+
+## Analyse par document
+
+On peut calculer la valeur émotionnelle moyenne de chaque document en faisant la somme des termes positifs et négatifs pour chaque document de la manière suivant : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(tidyr)
+
+lyon_bing_doc <- lyon_bing %>%
+  count(DocId, Title, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(average = positive - negative)
+
+```
+<br>
+**Explication**
+
+  * **count(DocId, Title, sentiment)** : compte le nombre d’occurrences pour chaque combinaison de DocId/Title (identifiant/titre de l'article) et score de sentiment
+  * **pivot_wider()** : fonction de tidyr qui réorganise le dataframe en format large. Chaque valeur de sentiment devient une colonne (ex. positive/negative) et les valeurs correspondantes sont remplies avec n (le nombre compté). values_fill = 0 remplace les valeurs manquantes par 0 (par exemple si un document n’a pas de mots négatifs).
+  * **mutate(average = positive - negative)** : on calcule la différence entre les mots positifs et négatifs dans chaque document et on la stocke dans une nouvelle variable (average). 
+
+Inspectons les résultats :
+```{r message = FALSE, warning = FALSE}
+
+# documents les plus négatifs 
+
+lyon_bing_doc %>% 
+  arrange(average) %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# documents les plus positifs 
+
+lyon_bing_doc %>% 
+  arrange(desc(average)) %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+<br>
+Autre mesure posible : proportion de mots positifs et négatifs
+```{r message = FALSE, warning = FALSE}
+
+# Proportion de mots positifs et négatifs 
+
+sentiment_prop <- lyon_bing_score %>%
+  mutate(is_positive = sentiment == "positive",
+         is_negative = sentiment == "négative") %>%
+  group_by(DocId, Title) %>%
+  summarise(
+    positive_ratio = mean(is_positive, na.rm = TRUE),
+    negative_ratio = mean(is_negative, na.rm = TRUE),
+    net_ratio = positive_ratio - negative_ratio
+  )
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+# documents les plus négatifs 
+
+sentiment_prop %>% arrange(net_ratio) %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# documents les plus positifs 
+
+sentiment_prop %>% arrange(desc(net_ratio)) %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+
+## Analyse au cours du temps
+
+On calcule la valeur moyenne par année : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+sentiment_year <- lyon_bing %>%
+  count(Year, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(average = positive - negative)
+
+```
+<br>
+```{r message = FALSE, warning = FALSE}
+
+ggplot(sentiment_year, aes(Year, average)) +
+  geom_col()  +
+  labs(title = "Sentiment value in the Lyon Corpus", 
+       x = "Year",
+       y = "Mean Value",
+       caption = "Based on 'bing' lexicon")
+
+```
+<br>
+## Comparaison  
+
+Comparons différents lexiques 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+afinn <- lyon_token_filtered %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(Year) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+bing_nrc_loughran <- bind_rows(
+    lyon_token_filtered %>% 
+      inner_join(get_sentiments("bing")) %>%
+      mutate(method = "Bing et al."),
+    lyon_token_filtered %>% 
+      inner_join(get_sentiments("nrc") %>% 
+                   filter(sentiment %in% c("positive", 
+                                           "negative"))
+      )  %>% mutate(method = "NRC"),
+      lyon_token_filtered %>% 
+      inner_join(get_sentiments("loughran")) %>% 
+      filter(sentiment %in% c("positive", 
+                              "negative")) %>%
+      mutate(method = "Loughran-McDonald")) %>%
+  count(method, Year, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+bind_rows(afinn, 
+          bing_nrc_loughran) %>%
+  ggplot(aes(Year, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y") +
+  labs(title = "Sentiment over time in the Lyon Corpus",
+       subtitle = "Comparative approach",
+       x = "Year",
+       y = "Mean Value")
+
+```
+
+<div class="alert alert-danger" role="alert">   
+**Important à retenir**
+
+L'application de l'analyse de sentiment dans le domaine des SHS soulève des questions spécifiques : la variabilité historique du langage, les biais culturels et temporels dans les corpus, la nécessité d'une validation par expertise disciplinaire, et l'importance de maintenir une approche critique face aux résultats quantitatifs. Par exemple, les historiens qui utilisent ces outils pour traiter de grands corpus d'archives numérisées soulignent l'importance de croiser ces analyses avec les méthodes traditionnelles de la discipline (lecture rapprochée des archives, contextualisation, critique herméneutique). De même pour les sociologues qui l'appliquent à l'analyse des médias sociaux de type Facebook ou X, par exemple, qui insistent sur l'importance de croiser avec des entretiens, observations de terrain et autres sources extérieures.</div> 
+
+## Quizz
+
+  1. Comparer les termes positifs et négatifs obtenus avec différents dictionnaires. Qu'observe-t-on ? Que peut-on en déduire ? 
+  2. Calculer la valeur émotionnelle des documents en utilisant au moins deux mesures différentes et comparer les résultats obtenus (examiner un échantillon des documents les plus négatifs et positifs). 
+  3. Le ville de Lyon est-elle perçue plus ou mois positivement selon les journaux ? Comment ces évaluations évoluent-elles au cours du temps ? 
+
+
+# Entités nommées
+
+La reconnaissance d'entitées nommées est une tâche bien établie en traitement automatique des langues qui consiste à détecter dans un corpus tous les noms de personnes, organisations, lieux, événements (et autres entitées selon les ontologies utilisées lors de l'entraînement).
+
+Différentes modèles et packages sont disponibles (voir l'aide-mémoire pour une liste détaillée). Dans cette séance, nous proposons d'utiliser les modèles fournis par le package **histtext** basés sur l'ontologie [Ontonote](https://catalog.ldc.upenn.edu/LDC2013T19).
+
+## Extraire et filtrer
+
+La fonction **ner_on_corpus()** permet d'extraire les entités nommées précalculées dans notre corpus issu dans la collection ProQuest : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(histtext)
+
+lyon_ner <- ner_on_corpus(lyon_corpus, "proquest", only_precomputed = TRUE)
+
+```
+
+<div class="alert alert-danger" role="alert"> 
+**A retenir**
+
+  * L'opération peut prendre du temps et exiger une grosse capacité de calcul. Pour les très gros corpus (plusieurs milliers de documents), il est conseillé de diviser le corpus en échantillons de plus petite taille. 
+  * Si vous disposez d'un corpus (sous forme de dataframe) où les entités n'ont pas été pré-calculées, vous pouvez utiliser la fonction équivalente **ner_on_df()**. 
+</div>
+
+Examinons la distribution entre les types d'entités : 
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_ner %>% group_by(Type) %>% count(sort = TRUE)
+
+```
+
+<br>
+On peut ensuite filtrer les entités qui nous intéressent plus particulièrement, par exemple les organisations : 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_org <- lyon_ner %>% filter(Type == "ORG")
+
+```
+
+ 
+## Normaliser et compter
+
+Un simple coup d’œil suffit pour constater que la liste d’entités extraites contient de nombreuses erreurs. Ces incohérences peuvent s'expliquer par plusieurs facteurs : la qualité variable des sources, les fluctuations historiques dans les usages orthographiques, les limitations de l’OCR, ou encore les imprécisions du modèle de reconnaissance d'entités nommées (NER). L’extraction d’information, notamment lorsqu’elle repose sur des entités, exige donc un travail préalable de nettoyage et de normalisation. Celui-ci est essentiel pour éviter des biais dans les analyses, qu’il s’agisse de mesurer la fréquence des entités, d’identifier les plus significatives ou de cartographier leurs relations via un réseau de cooccurrences.
+
+La première étape consiste à passer en revue les entités extraites pour repérer les anomalies et définir une stratégie de correction.
+
+Sur des jeux de données volumineux (plusieurs dizaines de milliers d’entités), la perfection est illusoire. Toutefois, des outils comme le package R **stringR** permettent d’automatiser une grande partie des opérations de nettoyage, souvent fastidieuses dans des logiciels comme Excel, tout en assurant la traçabilité des modifications. Nous proposons ici quelques méthodes simples et efficaces pour réduire le bruit de manière automatisée et transparente.
+
+Prenons l'exemple des entités organisations. 
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+library(dplyr)
+library(stringr)
+
+lyon_org_clean <- lyon_org %>%
+  mutate(Text_clean = str_replace_all(Text, "[^A-Za-zÀ-ÖØ-öø-ÿ\\s]", " ")) %>% 
+  mutate(Text_clean = str_squish(Text_clean)) # Supprime les espaces multiples
+
+lyon_org_clean <- lyon_org_clean %>% filter(str_squish(Text_clean) != "")  # supprime les cellules vides
+
+lyon_org_clean <- lyon_org_clean %>% mutate(Text_clean = str_replace(Text_clean, "Tiie", "The"))
+
+lyon_org_clean <- lyon_org_clean  %>% 
+  mutate(Text_clean = str_replace(Text_clean, regex("^\\s*of\\b", ignore_case = TRUE), "")) %>% 
+  mutate(Text_clean = str_replace(Text_clean, regex("^\\s*the\\b", ignore_case = TRUE), ""))  %>% 
+  mutate(Text_clean = str_replace(Text_clean, regex("^\\s*le\\b", ignore_case = FALSE), "")) %>% 
+  mutate(Text_clean = str_replace(Text_clean, regex("^\\s*la\\b", ignore_case = FALSE), "")) %>% 
+  mutate(Text_clean = str_to_title(Text_clean)) %>% 
+  mutate(Text_clean = str_squish(Text_clean))
+
+lyon_org_clean <- lyon_org_clean %>% filter(str_squish(Text_clean) != "")  # supprime les cellules vides à nouveau
+
+```
+<br>
+**Explications ligne à ligne**
+
+  * **mutate(Text_clean =)** : crée une nouvelle colonne pour stocker le texte corrigé 
+  * **str_replace_all(Text, "[^A-Za-zÀ-ÖØ-öø-ÿ\\s]", " ")**: élimine tous les caractères non alphabétiques
+  * **str_squish()** : supprime les espaces multiples en début et queue de string
+  * **filter(str_squish(Text_clean) != "")** : supprime les cellules vides résultant des opérations précédentes
+  * **str_replace(Text_clean, "Tiie", "The"))** : remplace les erreurs d'OCR identifiées sur le pronom "The"
+  * **str_replace(Text_clean, regex..) ** : supprime les pronoms et autres résidus indésirables en début de string (the, le, la of). **ignore_case = TRUE/FALSE** indique si l'on tient compte des majuscules ou non (Par exemple, on conserve *Le* dans *Le Matin* car c'est le nom d'un journal, mais on supprime *le* qui signale une imperfection dans la reconnaissance de l'entité). 
+  * **mutate(Text_clean = str_to_title(Text_clean))** : on capitalise tous les mots. Note: si l'on veut capitaliser uniquement le premier mot du string, on utilise **str_to_sentence()**. 
+
+<br>  
+Examinons le résultat : 
+
+```{r message = FALSE, warning = FALSE}
+
+lyon_org_clean %>% group_by(Text_clean) %>% count(sort = TRUE)
+
+```
+
+<br>
+Supprimons les "non-entités" qui comportent moins de 4 charactères et un seul token :
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+lyon_org_clean <- lyon_org_clean %>% 
+  mutate(nchar = nchar(Text_clean)) %>% 
+  mutate(token = ntoken(Text_clean)) 
+
+lyon_org_clean <- lyon_org_clean %>% filter(nchar > 3) %>% (token >1 )
+
+```
+<br>
+
+```{r message = FALSE, warning = FALSE}
+
+# toutes les entités
+
+lyon_org_clean_count <- lyon_org_clean %>% 
+  group_by(Text_clean) %>% 
+  count(sort = TRUE) 
+
+lyon_org_clean_count %>% arrange(desc(n))
+
+# entités uniques par document 
+
+lyon_org_clean_count_uniq <- lyon_org_clean %>% 
+  distinct(DocId, Text_clean) %>%
+  group_by(Text_clean) %>% count() 
+
+lyon_org_clean_count_uniq %>% arrange(desc(n))
+
+
+```
+
+
+<br>
+Le résultat n'est pas parfait, mais c'est déjà beaucoup mieux. R nous a permis de dégrossir le travail et d'automatiser des opérations extrêmement laborieuses tout en gardant une trace du processus (ce qui fait défaut quand on nettoie manuellement dans Excel par exemple). Rien n'empêche de fignoler à la main dans Excel si le jeu de données est de taille raisonnable (quelques centaines de lignes).   
+
+<div class="alert alert-success" role="alert"> 
+**A retenir** 
+
+  1. Toujours conserver la colonne d'origine : créer une nouvelle colonne avec le texte nettoyé pour pouvoir comparer avec le texte source et éventuellement y revenir si l'on fait un erreur. 
+  2. L'ordre des opérations a souvent une importance.  Il est conseillé de passer suffisamment de temps à examiner les résultats et de prendre des notes pour mettre au point la meilleure stratégie.
+</div>
+
+
+## Réseau d'entités
+
+Une fois la liste d’entités suffisamment nettoyée, on peut la transformer en réseau. Pourquoi opter pour une représentation en réseau ? Deux usages principaux se dégagent :
+
+  1. **Explorer les relations entre documents et entités**: Il est possible de construire un réseau bipartite reliant chaque document aux entités qu’il contient. Ce type de visualisation facilite l’exploration des données, en rendant plus intuitives certaines relations qu’un simple tableau ne permettrait pas toujours de percevoir. On peut ainsi repérer rapidement les documents riches en entités, ou ceux qui partagent un grand nombre d’occurrences avec d'autres.
+  2. **Analyser les cooccurrences entre entités** : en construisant un réseau d’entités fondé sur leurs cooccurrences (par exemple, dans un même document ou paragraphe), on peut analyser les liens entre elles : quelles personnes ou organisations apparaissent souvent ensemble ? Pourquoi ? Peut-on identifier des sous-groupes, des communautés, des figures centrales ? Ce type d’analyse permet de mettre en lumière des structures latentes dans le corpus, comme des champs thématiques ou des réseaux d’acteurs.
+
+Nous verrons plus en détail comment construire et analyser des réseaux avec R lors de la séance suivante. Dans cette séance, nous voyons brièvement comment transformer la liste d'entités en réseau et le visualiser avec l'outil interactif **padagraph** fourni par HistText. 
+
+### Entité-Document
+
+Nous allons d'abord construire un réseau reliant les documents aux entités qu'ils contiennent, en se limitant toujours aux organisations. Dans le cas où une même organisation est mentionnée plusieurs fois dans le même document, on choisit de ne conserver qu'une seule occurrence (une seule paire document-entité) en utilisant la fonction **distinct()**
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# # on crée la liste de liens (edge list) en sélectionnant les paires uniques document-organisation
+
+edge_doc_org <- lyon_org_clean %>% 
+  distinct(DocId, Text_clean) %>% 
+  transmute(from=DocId, to=Text_clean) 
+
+```
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# on crée une liste de noeud pour différencier les organisations des documents
+
+node_doc <- edge_doc_org %>% 
+  distinct(from) %>% 
+  rename(name = from) %>% 
+  mutate(Type = "Document")
+
+node_org <- edge_doc_org %>% 
+  distinct(to) %>% 
+  rename(name = to) %>% 
+  mutate(Type = "Organisation")
+
+node_list <- bind_rows(node_doc, node_org)
+
+```
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# on transforme la liste de liens en graphe avec igraph et tidygraph 
+
+ig <- graph_from_data_frame(d=edge_doc_org, vertices=node_list, directed = FALSE)
+tg <- tidygraph::as_tbl_graph(ig)
+
+```
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# on projette le graphe dans Padagraph 
+
+tg %N>% mutate(label=name) %>%
+  histtext::in_padagraph("lyon_net_doc_org")
+
+```
+
+### Entité-Entité
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# on sélectionne les organisations qui apparaissent au moins deux fois dans le corpus 
+
+lyon_top_org <- lyon_org_clean %>% 
+  group_by(Text_clean) %>% 
+  count() %>% 
+  filter(n>1)
+
+lyon_org_filtered <- lyon_org_clean %>% 
+  filter(Text_clean %in% lyon_top_org$Text_clean)
+
+```
+<br>
+On joint la liste d'organisations-document avec elle-même pour obtenir les liens directs entre organisations : 
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+edges_org <- lyon_org_filtered %>%
+  inner_join(lyon_org_filtered, by = "DocId") %>%
+  filter(Text_clean.x < Text_clean.y) %>%
+  transmute(from=Text_clean.x, to=Text_clean.y) %>%
+  distinct()
+
+```
+<br>
+**Décryptage ligne à ligne**
+
+  * **Objectif** : créer une table d’arêtes (`edges_org`) pour un réseau de cooccurrences d’entités présentes dans un même document (`DocId`).
+  * On part du data frame `lyon_org_filtered`, contenant les colonnes `DocId` (identifiant du document) et `Text_clean` (entité nettoyée).
+  * `inner_join(..., by = "DocId")` : croise toutes les entités présentes dans un même document entre elles (auto-jointure).
+  * `filter(Text_clean.x < Text_clean.y)` : élimine les doublons inversés (A–B vs B–A) et les paires réflexives (A–A), pour construire un graphe non orienté.
+  * `transmute(from = Text_clean.x, to = Text_clean.y)` : renomme les colonnes pour représenter les arêtes du graphe.
+  * `distinct()` : supprime les doublons de paires (présentes dans plusieurs documents), produisant une liste unique d’arêtes prête pour la visualisation ou l’analyse.
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# Comme pour le réseau précédent, on transforme la liste de liens en réseau avec igraph et tidygraph
+
+ig2 <- graph_from_data_frame(d=edges_org, vertices=NULL, directed = FALSE)
+tg2 <- tidygraph::as_tbl_graph(ig2)
+
+```
+
+```{r message = FALSE, warning = FALSE, eval = FALSE}
+
+# on projette dans Padagraph
+
+tg2 %N>% mutate(label=name) %>%
+  enpchina::in_padagraph("lyon_net_org")
+
+```
+<br>
+**Note**: en modifiant légèrement ce code, on pourrait créer un réseau liant des entités de nature différente, par exemple, organisations et personnes.
+
+## Quizz 
+
+  1. Sélectionner un type d'entité parmi l'ontologie proposée (personnes, organisations, lieux, événements, oeuvres de l'esprit...) en justifiant votre choix (comment pensez-vous pouvoir mobiliser cette information dans votre recherche) ? 
+  2. Examiner la liste brute d'entités obtenue en triant de différentes manières (ordre alphabétique, indice de confiance, longueur de l'entité...). Qu'observez-vous ? Quelles seront les implications sur les analyses ultérieures ?
+  3. Définissez une stratégie de nettoyage et de normalisation à partir des observations précédentes. 
+  4. Analysez et interprétez les résultats obtenus en mobilisant la méthode de votre choix (calcul de fréquence, réseau). Essayez d'en tirer un récit et des conclusions auxquelles on aurait pu aboutir en utilisant des méthodes classiques (*close reading*, recherche aléatoire).  
+
+# Références 
+
+  1. Bode, Katherine. “The Equivalence of ‘Close’ and ‘Distant’ Reading; or, Toward a New Object for Data-Rich Literary History.” *Modern Language Quarterly* 78, no. 1 (2017): 77–106.
+  2. Baroni, M., & Lenci, A. (2010). Distributional Memory: A General Framework for Corpus-Based Semantics. *Computational Linguistics*, 36(4), 673–721.
+  3. Michel, J.-B. et al. (2011). Quantitative analysis of culture using millions of digitized books. *Science*, 331(6014), 176–182.
+  4. Nunberg, G. (2011). Google’s Books project: A metadata train wreck. *Language Log* (blog, University of Pennsylvania).
+  5. Pechenick, E. A., Danforth, C. M., & Dodds, P. S. (2015). Characterizing the Google Books corpus: Strong limits to inferences of socio-cultural and linguistic evolution. *PLOS ONE*, 10(10): e0137041. 
+  6. Underwood, Ted. *Distant Horizons: Digital Evidence and Literary Change*. Chicago: University of Chicago Press, 2019.
+

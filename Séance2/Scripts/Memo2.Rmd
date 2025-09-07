@@ -1,0 +1,306 @@
+---
+title: "Séance 2: Aide-mémoire"
+author: "Cécile Armand"
+date: "2025-10-08"
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    number_sections: false
+    code_folding: show # hide
+    fig_caption: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE, fig.align="center"}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Définitions 
+
+## Généralités 
+
+Voici quelques définitions et clarifications utiles pour comprendre les différents champs de la linguistique de corpus et du traitement automatique du langage : 
+
+* **TAL (Traitement automatique du langage naturel)/ NLP (Natural Language Processing)** est le domaine le plus vaste. Il regroupe toutes les techniques (statistiques, linguistiques, computationnelles) permettant aux machines de comprendre et manipuler le langage humain.
+
+* **LLM (Large Language Models)**, comme ChatGPT ou BERT, sont une sous-catégorie récente et puissante du NLP. Ils reposent sur l’apprentissage profond et l'entraînement sur d’énormes corpus pour produire du texte, répondre à des questions, traduire, etc.
+
+* **Analyse de corpus** et **analyse textuelle** sont deux approches plus spécifiques, souvent utilisées en sciences humaines et sociales :
+
+  * **L’analyse de corpus** désigne l’étude quantitative ou qualitative d’un ensemble structuré de textes (corpus), souvent à l’aide d’outils NLP.
+  * **L’analyse textuelle** est le terme le plus général qui englobe toutes les méthodes d'analyse de texte, qu'elles soient qualitatives (analyse du discours, herméneutique) ou quantitatives (text mining, stylométrie).
+
+Ces deux dernières disciplines se chevauchent, car elles partagent des méthodes, mais ne sont pas limitées au NLP. Elles peuvent aussi utiliser des outils manuels ou théoriques. Elles peuvent cependant bénéficier des progrès du NLP et des LLM.
+
+La relation clé entre tous ces concepts est que le NLP s'appuie sur l'analyse textuelle pour ses méthodes, utilise l'analyse de corpus pour ses données d'entraînement, et les LLM représentent une de ses approches les plus avancées actuellement.
+
+Les schémas ci-dessous synthétisent les relations entre **NLP**, **LLM**, **analyse de corpus** et **analyse textuelle** :
+
+<center>
+
+![](Images/nlp_schema.png){width=50%}
+</center>
+
+
+Le schéma ci-dessous clarifie les relations entre les différents concepts et leurs domaines d'application:
+
+![](Images/nlp_concepts_schema.png)
+
+## Terme/Token
+
+**Token** : Un token est une unité de texte brute obtenue après segmentation (souvent par mots, ponctuation ou sous-mots). C’est le résultat du processus de *tokenization* (i.e., segmentation le plus souvent en mots). Un token peut être un mot, un chiffre, de la ponctuation, une contraction, etc. *Exemple* : "Cats don't like water." → Tokens : "Cats", "do", "n't", "like", "water", "."
+
+**Terme/Mot**: Un terme est une unité de texte normalisée, souvent utilisée dans les modèles de type *bag-of-words* ou *Latent Dirichlet Allocation* (LDA), après des étapes de nettoyage comme : mise en minuscule, suppression des stopwords, lemmatisation ou racinisation, parfois transformation en n-grammes. Un terme représente une entrée du vocabulaire (ou dictionnaire) du corpus. *Exemple* : Après nettoyage de "Cats don't like water." → Terms : "cat", "like", "water"
+
+| Terme     | Définition                                          | Exemple                        |
+| --------- | --------------------------------------------------- | ------------------------------ |
+| **Token** | Unité brute issue de la tokenisation                | `"Cats"`, `"don't"`, `"water"` |
+| **Term**  | Forme normalisée pour l’analyse (nettoyée, réduite) | `"cat"`, `"like"`, `"water"`   |
+
+## Bigrams/Co-occurrences
+
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;}
+.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-j6zm{font-weight:bold;text-align:left;vertical-align:bottom}
+.tg .tg-7zrl{text-align:left;vertical-align:bottom}
+</style>
+<table class="tg"><thead>
+  <tr>
+    <th class="tg-j6zm">Critère</th>
+    <th class="tg-j6zm">Analyse de bigrams</th>
+    <th class="tg-j6zm">Analyse de co-occurrences</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td class="tg-j6zm">Position</td>
+    <td class="tg-7zrl">Mots strictement adjacents</td>
+    <td class="tg-7zrl">Mots proches mais pas nécessairement contigus</td>
+  </tr>
+  <tr>
+    <td class="tg-j6zm">Fenêtre</td>
+    <td class="tg-7zrl">Fixe (2 mots consécutifs)</td>
+    <td class="tg-7zrl">Variable (phrase, paragraphe, n-gramme glissant)</td>
+  </tr>
+  <tr>
+    <td class="tg-j6zm">Objectif</td>
+    <td class="tg-7zrl">Étudier les collocations et structures syntaxiques</td>
+    <td class="tg-7zrl">Explorer des associations sémantiques larges</td>
+  </tr>
+  <tr>
+    <td class="tg-j6zm">Souplesse</td>
+    <td class="tg-7zrl">Faible (strictement linéaire)</td>
+    <td class="tg-7zrl">Forte (peut inclure des relations indirectes)</td>
+  </tr>
+  <tr>
+    <td class="tg-j6zm">Exemples d’usage</td>
+    <td class="tg-7zrl">Modélisation de langage, suggestions automatiques</td>
+    <td class="tg-7zrl">Analyse de discours, construction de graphes sémantiques</td>
+  </tr>
+</tbody></table>
+
+
+
+## Racinisation/Lemmatisation 
+
+**Racinisation (Stemming)**: Méthode heuristique et rapide qui supprime les suffixes pour ramener un mot à sa « racine ». Ses principales caractéristiques sont les suivantes : 
+
+  * Produit des formes non linguistiques (parfois incorrectes).
+  * Ne garantit pas une racine réelle.
+  * Plus rapide, mais moins précise.
+
+**Lemmatisation**: Technique plus linguistique qui réduit un mot à son lemme (forme canonique), en tenant compte de sa catégorie grammaticale et de son contexte.Caractéristiques :
+  
+  * Produit des mots corrects.
+  Plus précise, mais plus lente (nécessite un analyseur morphologique et lexical).
+  
+**Tableau récapitulatif**  
+  
+| Aspect                | Racinisation (Stemming)     | Lemmatisation                             |
+| --------------------- | --------------------------- | ----------------------------------------- |
+| Approche              | Heuristique, règles simples | Basée sur des dictionnaires et grammaires |
+| Vitesse               | Rapide                      | Plus lente                                |
+| Précision             | Faible à moyenne            | Élevée                                    |
+| Forme de sortie       | Racine (parfois incorrecte) | Lemme correct (forme canonique)           |
+| Contexte linguistique | Ignoré                      | Pris en compte                            |
+
+**Exemples**
+
+| Mot d’origine | Langue   | Racinisation | Lemmatisation |
+| ------------- | -------- | ------------ | ------------- |
+| **running**   | Anglais  | runn         | run           |
+| **better**    | Anglais  | better       | good          |
+| **went**      | Anglais  | went         | go            |
+| **étudiants** | Français | étudi        | étudiant      |
+| **mangeais**  | Français | mang         | manger        |
+| **meilleure** | Français | meilleu      | bon           |
+
+
+# Fréquences lexicales
+
+Voici un tableau comparatif des principales mesures de fréquences lexicales : 
+
+| **Méthode**                            | **Approche**                 | **Utilité principale**                              | **Avantages**                                                    | Limites   principales                                                      |   |
+|----------------------------------------|------------------------------|-----------------------------------------------------|------------------------------------------------------------------|----------------------------------------------------------------------------|---|
+| **Fréquence absolue**                  | Statistique descriptive      | Repérer les mots les plus fréquents                 | Simple à calculer et interpréter                                 | Peu discriminante ; biais vers les   mots-outils                           |   |
+| **Fréquence relative**                 | Statistique descriptive      | Comparer des corpus de taille différente            | Normalisation facile                                             | Ne résout pas le manque de   spécificité                                   |   |
+| **TF-IDF**                             | Pondération statistique      | Identifier les termes informatifs dans un document  | Pondère selon la rareté ; très utilisé en IR et classification   | Peu interprétable sur corpus global   ; dépend de la granularité du corpus |   |
+| **Log-likelihood**                     | Statistique inférentielle    | Comparer deux corpus ; repérer les mots saillants   | Statistiquement robuste, bon avec faibles fréquences             | Moins intuitif ; nécessite corpus de   référence                           |   |
+| **Chi² (khi-deux)**                    | Statistique inférentielle    | Tester la significativité d’un écart de fréquence   | Méthode classique d’analyse comparative                          | Moins fiable pour faibles fréquences                                       |   |
+| **PMI (Pointwise Mutual Info)**        | Probabiliste                 | Identifier les collocations et cooccurrences fortes | Met en évidence des associations lexicales riches                | Favorise les cooccurrences rares ;   bruit potentiel                       |   |
+| **Z-score**                            | Statistique standardisée     | Repérer les mots sur- ou sous-représentés           | Donne une idée de la saillance statistique                       | Dépend fortement de la taille et   homogénéité du corpus                   |   |
+| **Word Embeddings (Word2Vec,   etc.)** | Apprentissage automatique    | Représenter les relations sémantiques               | Capture des relations fines, contextuelles ; utile en clustering | Opaque ; nécessite corpus volumineux   ; complexité technique              |   |
+| **Topic Modeling (LDA)**               | Probabiliste / non supervisé | Extraire les thèmes latents d’un corpus             | Permet d’explorer la structure thématique sans supervision       | Résultats abstraits ; nécessite   réglages fins                            |   |
+
+# Topic Modeling
+
+## Principales approches
+
+Voici un tableau comparatif des principales méthodes de *topic modeling*, structuré autour des grandes approches classiques et récentes (probabilistes, vectorielles, neuronales).
+
+
+| Méthode                                           | Principe                                                                                                        | Avantages                                                                                                             | Inconvénients                                                                                                    | Exemples d’usage                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **LDA (Latent Dirichlet Allocation)**             | Modèle probabiliste bayésien : chaque document est une mixture de sujets, chaque sujet une distribution de mots | – Interprétable<br>– Implémentation robuste (Gensim, sklearn)<br>– Méthode bien documentée                            | – Hypothèses fortes (distribution Dirichlet)<br>– Sensible au nombre de topics<br>– Mal adapté aux textes courts | – Analyse d’articles scientifiques<br>– Thématiques de corpus journalistiques |
+| **NMF (Non-negative Matrix Factorization)**       | Factorisation matricielle : décomposition de la matrice document-terme en deux matrices non négatives           | – Rapide<br>– Plus stable que LDA<br>– Facile à interpréter pour des données TF-IDF                                   | – Non probabiliste<br>– Moins performante sur grands corpus<br>– Nécessite un pré-traitement optimal             | – Résumés de documents<br>– Classification de tickets support client          |
+| **LSA / LSI (Latent Semantic Analysis/Indexing)** | Réduction de dimension par SVD (Singular Value Decomposition)                                                   | – Basé sur l’algèbre linéaire<br>– Capte les synonymies/relations sémantiques                                         | – Moins interprétable<br>– Ne produit pas de probabilités<br>– Sensible au bruit                                 | – Recherche documentaire<br>– Indexation de bibliothèque                      |
+| **HDP (Hierarchical Dirichlet Process)**          | Extension de LDA permettant un nombre de topics infini (apprentissage non paramétrique)                         | – Pas besoin de fixer *a priori* le nombre de topics<br>– Meilleure modélisation de la complexité                     | – Plus complexe à implémenter<br>– Plus lent<br>– Moins d’outils disponibles                                     | – Corpus très hétérogènes<br>– Analyse exploratoire open-ended                |
+| **BTM (Biterm Topic Model)**                      | Modèle adapté aux textes courts (Twitter, SMS), basé sur la co-occurrence de *biterms*                          | – Optimisé pour les courts textes<br>– Meilleure performance que LDA sur Twitter                                      | – Moins interprétable que LDA<br>– Spécifique aux très courts textes                                             | – Analyse de tweets<br>– FAQ, titres de presse                                |
+| **Top2Vec / BERTopic**                            | Approches modernes basées sur des représentations vectorielles (word embeddings + clustering)                   | – Captent sémantique profonde<br>– Ne nécessite pas de pré-spécifier *k* topics<br>– Adaptées aux corpus multilingues | – Moins interprétables<br>– Requiert plus de ressources (GPU, RAM)<br>– Performances dépendantes des embeddings  | – Forums, critiques en ligne<br>– Résumés automatiques                        |
+| **CTM (Combined Topic Model)**                    | Combine les embeddings BERT + modèle probabiliste de type LDA                                                   | – Équilibre entre interprétabilité et performances<br>– Très bon sur des corpus complexes                             | – Implémentation avancée<br>– Plus coûteux computationnellement                                                  | – Applications académiques<br>– Analyse de débats parlementaires              |
+
+**Points communs entre les méthodes**
+
+  * Objectif partagé : identifier des structures thématiques latentes dans un corpus non étiqueté.
+  * Prétraitement requis : nettoyage, tokenisation, lemmatisation, vectorisation.
+  * Evaluation similaire : cohérence des topics (topic coherence), perplexité, validation humaine.
+  * Besoin d'interprétation : les résultats ne sont pas automatiquement “intelligibles”, l’intervention humaine est souvent requise pour nommer les topics.
+  
+## Comment choisir
+  
+| Contexte                                      | Méthode(s) recommandée(s) |
+| --------------------------------------------- | ------------------------- |
+| Corpus long et structuré (articles, rapports) | LDA, NMF, CTM             |
+| Corpus court (tweets, SMS, titres)            | BTM, BERTopic, Top2Vec    |
+| Analyse exploratoire sans fixer *k*           | HDP, Top2Vec              |
+| Nécessité d’interprétation humaine            | LDA, NMF                  |
+| Recherche sémantique poussée                  | BERTopic, CTM             |
+
+## STM
+
+Voici un tableau récapitulatif des principales fonctions du package structural topic modeling (stm) qui interviennent dans le prétraitement du corpus et la construction des modèles :  
+
+| **Fonction**             | **Rôle principal**                                                                | **Moment d’utilisation**                          |
+| ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `textProcessor()`        | Nettoyer et préparer les textes (tokenisation, suppression stopwords, stemming).  | **Début** – prétraitement des données textuelles. |
+| `plotRemoved()` *(opt.)* | Visualiser les mots/documents supprimés lors du nettoyage pour valider les choix. | Après `textProcessor()`, si besoin de contrôle.   |
+| `prepDocuments()`        | Transformer textes et métadonnées en objets compatibles STM.                      | Juste avant la modélisation.                      |
+| `searchK()`              | Évaluer plusieurs nombres de topics et aider à choisir le K optimal.              | Après préparation, avant d’estimer le modèle.     |
+| `stm()`                  | Estimer le *Structural Topic Model* avec ou sans covariables.                     | Étape centrale de modélisation.                   |
+| `estimateEffect()`       | Mesurer l’effet de covariables sur la prévalence des topics.                      | Après estimation du modèle (`stm()`).             |
+
+
+# Analyse de sentiment 
+
+Voici un tableau synthétique des différentes approches existantes pour l'analyse de sentiment : 
+
+| **Approche** | **Principe** | **Forces** | **Limites** | **Applications en SHS** | **Références clés** |
+|--------------|--------------|------------|-------------|-------------------------|-------------------|
+| **Lexicale (basée sur des règles)** | Dictionnaires de mots avec scores de polarité (SentiWordNet, VADER, LIWC) | • Simplicité<br>• Transparence<br>• Pas de corpus d'entraînement<br>• Efficacité générale | • Problème de négation<br>• Insensibilité au contexte<br>• Difficultés avec ironie/sarcasme<br>• Expressions idiomatiques | • Moral des troupes WWI (correspondances)<br>• Évolution attitudes immigration (presse)<br>• Sentiment religieux (textes historiques) | • Jockers & Syuzhet (2015) - analyse littéraire<br>• Reagan et al. (2017) - textes historiques<br>• Acerbi et al. (2013) - livres Google Books |
+| **Apprentissage supervisé** | Algorithmes entraînés sur corpus annotés (SVM, Naive Bayes, RF) | • Adaptation au domaine<br>• Prise en compte du contexte<br>• Performance supérieure<br>• Contrôle de la qualité | • Besoin données annotées<br>• Surapprentissage<br>• Difficulté généralisation<br>• Coût annotation | • Débats parlementaires britanniques XIXe<br>• Forums anthropologiques<br>• Presse politique historique | • Yu et al. (2008) - opinions politiques<br>• Barberá (2015) - réseaux sociaux politiques<br>• Gentzkow & Shapiro (2010) - biais médiatiques |
+| **Apprentissage profond** | Réseaux de neurones (LSTM, BERT, GPT) avec compréhension contextuelle | • Compréhension contextuelle<br>• Nuances subtiles<br>• Performance SOTA<br>• Gestion ironie/sarcasme | • "Boîte noire"<br>• Coût computationnel<br>• Besoin gros volumes<br>• Biais des données | • Témoignages Shoah<br>• Correspondance Virginia Woolf<br>• Journaux intimes guerre civile | • Bamman et al. (2019) - littérature<br>• Underwood (2019) - genres littéraires<br>• Schmidt (2012) - archives numériques |
+| **Non-supervisée** | Topic modeling, clustering sans annotation préalable (LDA, K-means) | • Pas d'annotation<br>• Découverte patterns<br>• Adaptabilité<br>• Exploration exploratoire | • Évaluation difficile<br>• Interprétation subjective<br>• Moins de précision<br>• Validation complexe | • Journaux intellectuels entre-deux-guerres<br>• Cahiers de doléances 1789<br>• Archives municipales | • Blei & Lafferty (2009) - textes historiques<br>• Mimno (2012) - corpus historiques<br>• Nelson (2020) - archives numériques |
+| **Hybride/Multimodale** | Combinaison méthodes + autres modalités (image, audio) | • Robustesse<br>• Information multiple<br>• Compensation faiblesses<br>• Validation croisée | • Complexité technique<br>• Interprétation difficile<br>• Coût développement<br>• Expertise multiple | • Presse + images événements historiques<br>• Films + critiques + réceptions<br>• Archives multimédia | • Moretti (2013) - littérature quantitative<br>• Cordell (2017) - presse historique<br>• Arnold & Tilton (2015) - photographies historiques |
+
+
+## Corpus typiques
+- Archives numérisées (correspondances, journaux, registres)
+- Presse historique et périodiques
+- Textes littéraires et témoignages
+- Documents parlementaires et politiques
+- Sources ethnographiques et anthropologiques
+
+## Défis méthodologiques
+
+- **Variabilité historique du langage** : évolution lexicale, syntaxique et sémantique
+- **Biais temporels et culturels** : représentativité des corpus historiques
+- **Validation disciplinaire** : nécessité d'expertise en sciences humaines
+- **Échelle temporelle** : analyse diachronique sur longues périodes
+
+
+# Principaux packages R pour l'analyse de corpus 
+
+Voici une liste des principaux packages R pour le traitement automatique du langage naturel (NLP) et l'analyse de corpus, classés par fonctionnalité (prétraitement, modélisation, visualisation, etc.), avec une brève description pour chacun : 
+
+## Prétraitement et manipulation de texte
+
+| Package                      | Description                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **`tm`**                     | L’un des plus anciens et populaires pour la manipulation de corpus textuels : nettoyage, tokenisation, etc.    |
+| **`textclean`**              | Fonctions utiles pour nettoyer du texte brut (emojis, contractions, ponctuation, etc.).                        |
+| **`stringr`** (du tidyverse) | Fournit une interface simple et cohérente pour manipuler des chaînes de caractères.                            |
+| **`text`**                   | Fournit des outils modernes pour le traitement de texte, basé sur les principes du tidyverse.                  |
+| **`tidytext`**               | Convertit les textes en formats *tidy* pour analyse et visualisation ; très intégré avec `dplyr` et `ggplot2`. |
+| **`quanteda`**               | Très rapide et efficace pour corpus volumineux ; manipulation, tokenisation, n-grammes, etc.                   |
+| **`tokenizers`**             | Outils pour découper en mots, phrases, paragraphes, etc.                                                       |
+| **`stopwords`**              | Fournit des listes multilingues de mots vides (stopwords).                                                     |
+
+## Analyse et modélisation
+
+| Package                             | Description                                                                                  |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| **`topicmodels`**                   | Implémente LDA, CTM et autres modèles probabilistes de topics.                               |
+| **`text2vec`**                      | Bibliothèque complète et rapide pour vectorisation, TF-IDF, LDA, GloVe, classification, etc. |
+| **`stm` (Structural Topic Models)** | Pour modèles de topics avec covariables (métadonnées intégrées dans l’analyse).              |
+| **`lda`**                           | Implémentation plus bas niveau du modèle LDA, avec plus de contrôle.                         |
+| **`udpipe`**                        | Tagging POS, lemmatisation, parsing syntaxique via des modèles pré-entraînés.                |
+| **`openNLP`**                       | Interface R vers la bibliothèque Apache OpenNLP pour POS, entités nommées, parsing.          |
+| **`cleanNLP`**                      | Framework pour traiter les textes avec plusieurs backend (spaCy, CoreNLP, etc.).             |
+| **`textTinyR`**                     | Pour textes massifs : embeddings, similarity, LSA, etc.                                      |
+| **`sentimentr`**                    | Analyse de sentiment basée sur le contexte syntaxique.                                       |
+
+
+## Visualisation
+
+| Package           | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| **`ggwordcloud`** | Création de nuages de mots avec `ggplot2`.                            |
+| **`wordcloud`**/**`wordcloud2`**   | Packages classiques pour générer des nuages de mots.                    |
+| **`textplot`**    | Fonctions de visualisation pour `quanteda`.                           |
+| **`widyr`**       | Pour explorer les cooccurrences de mots et relations via des graphes. |
+
+
+## Interfaces avec des outils externes
+
+| Package                   | Description                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| **`reticulate`**          | Permet d'utiliser Python (et donc spaCy, Transformers, etc.) dans un environnement R.  |
+| **`cleanNLP`**            | Interface avec CoreNLP, spaCy, UDPipe, etc.                                            |
+| **`keras`, `tensorflow`** | Pour NLP avec deep learning (R vers TensorFlow/Keras).                                 |
+| **`text`**                | NLP moderne avec word/sentence embeddings ; utilise des backends Python sous le capot. |
+
+
+## Deep Learning et embeddings
+
+| Package                               | Description                                                          |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| **`text2vec`**                        | Implémente GloVe, Skip-Gram, CBOW, etc.                              |
+| **`text`**                            | Génère des embeddings de phrases/documents avec une approche simple. |
+| **`transformers`** (via `reticulate`) | Accès à Hugging Face via Python (nécessite `reticulate`).            |
+| **`bert`**                            | Modèles BERT via Keras pour classification ou embeddings.            |
+
+
+## Packages récents / spécialisés
+
+| Package                               | Description                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| **`superml`**                         | Inclut des fonctions NLP avec ML intégrées.                              |
+| **`textrecipes`** (avec `tidymodels`) | Prétraitement textuel dans le flux de modélisation machine learning.     |
+| **`tidylo`**                          | Analyse des log-odds pour trouver les mots caractéristiques d’un groupe. |

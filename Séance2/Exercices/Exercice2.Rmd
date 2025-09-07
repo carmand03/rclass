@@ -1,0 +1,43 @@
+---
+title: "Séance 2 : Exercices"
+author: "Cécile Armand"
+date: "2025-10-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Pour vous entraîner à appliquer les méthodes introduites dans la deuxième séance consacrée à l'analyse de corpus avec R, deux exercices sont proposés, au choix : 
+
+# Corpus imposé 
+
+A partir du corpus utilisé pendant le cours (Lyon dans la presse ProQuest), essayez de répondre aux questions suivantes : 
+
+  1. Quels sont les grandes thèmes associés à Lyon dans la presse anglophone en Chine avant 1950 ? A quels événements ou quels débats précis correspondent-ils ? 
+  
+  * tester différents modèles en modifiant le nombre de *topics*
+  * citer des exemples précis d’articles illustrant les *topics* identifiés 
+    
+ 2. Y a-t-il des années plus négatives ou positives que d’autres ? Pourquoi ?  
+ 
+ * comparer différents dictionnaires 
+ * tester différentes méthodes pour agréger les scores par article ou année 
+    
+  3. Quels sont les personnes, les organisations et les événements les plus fortement associés à Lyon ? 
+
+  4. En conclusion, qu’apprend-t-on sur la présence de Lyon dans la presse en Chine avant 1950 ? Rédigez un petit essai synthétisant vos découvertes, en explicitant et justifiant les choix méthologiques. Soulignez aussi les limites ou les difficultés rencontrées. 
+
+Pour chaque question, expliquez votre démarche et rédigez le code proprement de manière à le rendre compréhensible pour vos lecteurs. 
+
+
+# Corpus libre
+
+  1. Importez votre propre corpus ou ou construisez-le avec [histtext](https://bookdown.enpchina.eu/HistText_Book/) parmi les collections proposées.
+  2. Formulez deux ou trois hypothèses de recherche sur ce corpus. 
+  3. Choisissez au moins deux méthodes adaptées pour les explorer. 
+  4. Rédigez un petit essai de synthèse. Qu'avez-vous découvert ? Vos intuitions sont-elles confirmées ? Quelles difficultés avez-vous rencontrées ? Quelles stratégies peut-on envisager pour les surmonter ? 
+
+A chaque étape, expliquez votre démarche et rédigez le code proprement de manière à le rendre compréhensible pour vos lecteurs. 
