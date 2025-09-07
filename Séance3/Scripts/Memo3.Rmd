@@ -1,0 +1,232 @@
+---
+title: "Séance 3 : Aide-Mémoire"
+author: "Cécile Armand"
+date: "2025-10-15"
+
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    number_sections: false
+    code_folding: show # hide
+    fig_caption: true
+    df_print: paged
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Définitions
+
+## Matrices
+
+Les matrices d’adjacence et matrices d’incidence sont deux façons de représenter des graphes, mais elles servent des objectifs différents selon la nature du réseau — notamment s’il est simple ou bipartite. Voici un tableau synthétique comparant leurs caractéristiques et différences :
+
+| Caractéristique     | **Adjacency Matrix**             | **Incidence Matrix**                           |
+| ------------------- | -------------------------------- | ---------------------------------------------- |
+| Forme               | Carrée (*n × n*)                 | Rectangulaire (*n × m*)                        |
+| Représente          | Connexions entre **nœuds**       | Connexions entre **nœuds et arêtes**           |
+| Utile pour          | Calculs de centralité classiques | Représentation explicite des liens individuels |
+| Adaptée aux graphes | Simples, orientés, pondérés      | Bipartites, multigraphes, graphe orienté/non   |
+| Nombre de colonnes  | = nombre de nœuds                | = nombre de liens/arêtes                       |
+
+## Mesures globales
+
+**Connexité**: Un graphe connexe est un graphe dans lequel il existe un chemin entre chaque paire de sommets. Autrement dit, aucun sommet n’est isolé : on peut aller de n’importe quel sommet à n’importe quel autre, en suivant les arêtes du graphe. Dans igraph, on peut évaluer la connexité d'un graphe avec deux fonctions :
+
+  * `is_connected(g)` : pour tester la connexité du graphe. Renvoie TRUE si le graphe est entièrement connexe, FALSE sinon.
+  * `components(g)` : pour décomposer le graphe en composantes connexes. La fonction renvoie une liste des composantes (sous-ensembles connexes). Elle est utile pour savoir combien de "blocs isolés" le graphe contient.
+  
+## Centralités
+
+Le tableau ci-joint synthétise les principales mesures de centralité disponibles avec igraph. Les plus couramment utilisées sont illustrées ci-dessous.  
+
+<center>
+
+![](Centralites.png){width=50%}
+
+</center>
+
+| Centralité                       | Fonction `igraph`                   | Description                                                                                    |
+| -------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Degré**                        | `degree()`                          | Nombre d'arêtes connectées à un sommet (entrantes, sortantes ou totales).                      |
+| **Intermédiarité (nœuds)**       | `betweenness()`                     | Compte le nombre de plus courts chemins passant par un sommet.                                 |
+| **Intermédiarité (arêtes)**      | `edge_betweenness()`                | Compte le nombre de plus courts chemins passant par une arête.                                 |
+| **Proximité**                    | `closeness()`                       | Inverse de la somme des distances d’un sommet aux autres (plus petite = plus central).         |
+| **Éigenvector (valeur propre)**  | `eigen_centrality()`                | Tient compte non seulement du nombre de voisins, mais aussi de leur influence.                 |
+| **Centralité de Katz**           | `alpha_centrality()`                | Variante pondérée de la centralité de degré, intégrant les chemins indirects (et orientés).    |
+| **Centralité de Bonacich**       | `power_centrality()`                | Généralisation de la centralité de Katz avec paramètre d’influence.                            |
+| **PageRank**                     | `page_rank()`                       | Modélise la probabilité de visite d’un sommet par un "surfeur aléatoire" (comme Google).       |
+| **Rayonnement (hub/authority)**  | `hub_score()` / `authority_score()` | Score des hubs (émetteurs forts) et des autorités (récepteurs forts), selon l’algorithme HITS. |
+| **Rayonnement total (directed)** | `subgraph_centrality()`             | Nombre de sous-graphes auxquels un nœud participe (rarement utilisé car coûteux).              |
+
+
+
+# Principales fonctions de igraph
+
+Voici une liste des principales fonctions et mesures disponibles dans le package **`igraph`** pour décrire et analyser un réseau (graphe). Elles couvrent les **propriétés globales**, les **caractéristiques des sommets (noeuds) et arêtes (liens)**, ainsi que les **outils de détection de structures** (communautés, etc.).
+
+
+## 1. Statistiques globales du réseau
+
+| Fonction                               | Description                                               |
+| -------------------------------------- | --------------------------------------------------------- |
+| `gorder(graph)`                        | Nombre de **sommets** (ordre du graphe)                   |
+| `gsize(graph)`                         | Nombre d’**arêtes** (taille du graphe)                    |
+| `is_connected(graph)`                  | Le graphe est-il connexe ?                                |
+| `components(graph)`                    | Détection des **composantes connexes**                    |
+| `diameter(graph)`                      | **Diamètre** du graphe (plus longue plus courte distance) |
+| `mean_distance(graph)`                 | **Distance moyenne** entre les nœuds                      |
+| `edge.density(graph)`                 | **Densité** du graphe                                     |
+| `transitivity(graph, type = "global")` | **Coefficient de clustering global**                      |
+| `reciprocity(graph)`                   | **Réciprocité** (dans les graphes orientés)               |
+
+
+## 2. Mesures centrées sur les sommets (nœuds)
+
+| Fonction                                      | Description                                              |
+| --------------------------------------------- | -------------------------------------------------------- |
+| `degree(graph, mode = "all")`                 | **Degré** des nœuds (nombre de liens)                    |
+| `strength(graph)`                             | **Force** pondérée (somme des poids des liens)           |
+| `closeness(graph)`                            | **Centralité de proximité**                              |
+| `betweenness(graph)`                          | **Centralité d’intermédiarité**                          |
+| `eigen_centrality(graph)`                     | **Centralité vectorielle propre**                        |
+| `page_rank(graph)`                            | **PageRank** (influence d’un nœud)                       |
+| `constraint(graph)`                           | **Contraintes structurelles** (théorie de Burt)          |
+| `hub_score(graph)` / `authority_score(graph)` | Score de **hub** / **autorité** (HITS algorithm)         |
+| `neighborhood(graph, order = 1)`              | Renvoie les **voisins directs** (ou à n pas) d’un sommet |
+
+
+## 3. Mesures sur les arêtes
+
+| Fonction                     | Description                            |
+| ---------------------------- | -------------------------------------- |
+| `edge_betweenness(graph)`    | **Centr. d’intermédiarité** des arêtes |
+| `E(graph)$weight`            | Accès aux **poids** des arêtes         |
+| `delete_edges(graph, edges)` | Supprimer des arêtes                   |
+
+## 4. Distances et chemins
+
+| Fonction                          | Description                                    |
+| --------------------------------- | ---------------------------------------------- |
+| `shortest_paths(graph, from, to)` | **Plus court chemin** entre deux nœuds         |
+| `distances(graph)`                | **Matrice des distances** entre tous les nœuds |
+| `mean_distance(graph)`            | **Distance moyenne**                           |
+| `diameter(graph)`                 | **Diamètre** du graphe                         |
+| `path_length_hist(graph)`         | Histogramme des longueurs de chemins           |
+
+
+## 5. Détection de communautés et structures
+
+| Fonction                        | Description                                         |
+| ------------------------------- | --------------------------------------------------- |
+| `cluster_walktrap(graph)`       | Détection de **communautés** par marches aléatoires |
+| `cluster_louvain(graph)`        | **Méthode de Louvain** (optimisation de modularité) |
+| `cluster_fast_greedy(graph)`    | Regroupement hiérarchique **greedy**                |
+| `membership()`                  | Renvoie les **groupes d’appartenance**              |
+| `modularity(graph, membership)` | Calcule la **modularité** d’une partition           |
+
+
+## 6. Visualisation rapide
+
+| Fonction                                        | Description                            |
+| ----------------------------------------------- | -------------------------------------- |
+| `plot(graph)`                                   | Visualisation de base                  |
+| `plot.igraph(graph, vertex.size=, edge.width=)` | Ajout d’attributs visuels              |
+| `layout_with_fr()`                              | Algorithme de **Fruchterman-Reingold** |
+| `layout_with_kk()`                              | **Kamada-Kawai**                       |
+| `layout_as_tree()`                              | Arborescence                           |
+| `set.seed()`                                    | Pour reproductibilité des dispositions |
+
+
+## 7. Accès, filtrage et manipulation
+
+| Fonction                        | Description                                   |
+| ------------------------------- | --------------------------------------------- |
+| `V(graph)` / `E(graph)`         | Accès aux **nœuds** / **arêtes**              |
+| `degree_distribution(graph)`    | Distribution des degrés                       |
+| `subgraph.edges(graph, edges)`  | Extraire un **sous-graphe**                   |
+| `induced_subgraph(graph, vids)` | Sous-graphe à partir d’un ensemble de sommets |
+| `delete_vertices(graph, v)`     | Supprimer un ou plusieurs sommets             |
+
+
+## 8. Sauvegarde & export
+
+| Fonction                                                              | Description                              |
+| --------------------------------------------------------------------- | ---------------------------------------- |
+| `as_data_frame(graph, what = "edges")`                                | Convertir en **edge list**               |
+| `write_graph(graph, file = "mon_graphe.graphml", format = "graphml")` | Exporter pour **Gephi** ou **Cytoscape** |
+
+# Principaux packages R pour l'analyse et la visualisation de réseaux
+
+Voici un **tableau comparatif** des principaux packages R permettant l’**analyse et la visualisation de réseaux**. Ces packages sont couramment utilisés en sciences sociales, en analyse des réseaux sociaux (SNA), en humanités numériques, et en biologie des systèmes :
+
+| **Package**            | **Type d’analyse**                  | **Visualisation**            | **Forces principales**                                                       | **Limites**                                           |
+| ---------------------- | ----------------------------------- | ---------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `igraph`               | Analyse de graphes classique        | Basique                      | Complet, rapide, très bien documenté, central dans l'écosystème              | Graphismes limités, syntaxe parfois complexe          |
+| `ggraph` + `tidygraph` | Analyse + visualisation (tidyverse) | Très avancée (via `ggplot2`) | Syntaxe fluide de type `tidyverse`, superbes visualisations avec `ggraph`    | Courbe d’apprentissage si pas familier avec `ggplot2` |
+| `network`              | Analyse des réseaux SNA             | Basique à modérée            | Compatible avec `sna` pour les méthodes classiques de SNA                    | Moins populaire aujourd’hui                           |
+| `sna`                  | Analyse des réseaux SNA             | Limitée                      | Méthodes statistiques de SNA (centralité, densité, etc.)                     | Pas conçu pour la visualisation                       |
+| `statnet`              | Suite complète SNA                  | Moyenne (via `network`)      | Modélisation (ERGMs, TERGMs), très utilisé en sociologie                     | Courbe d’apprentissage élevée                         |
+| `visNetwork`           | Visualisation interactive           | Interactive (Web)            | Graphiques dynamiques, compatible avec `shiny`, supporte l’export HTML       | Analyse limitée, dépendance à JavaScript              |
+| `ndtv`                 | Réseaux dynamiques temporels        | Animations                   | Idéal pour visualiser l’évolution des réseaux dans le temps                  | Nécessite une préparation soignée des données         |
+| `threejs`              | Visualisation 3D (WebGL)            | Interactive (3D)             | Graphiques en 3D, légers, très intuitifs                                     | Analyse limitée, pas de fonctionnalités statistiques  |
+| `geomnet`              | Visualisation statique              | Static (ggplot2)             | Intégration avec `ggplot2` pour graphes simples                              | Moins de fonctionnalités que `ggraph`                 |
+| `networkD3`            | Visualisation interactive           | D3.js (via htmlwidgets)      | Représentation style “force-directed”, facile à intégrer dans des dashboards | Analyse de réseau inexistante                         |
+| `igraph` + `tcltk`     | Visualisation interactive (legacy)  | Interactive (Tk)             | Rapide, léger, utile pour de petites explorations                            | Interface dépassée, peu flexible                      |
+
+<br>
+
+**Conseils d'utilisation**
+
+  * Pour **l’analyse classique de réseaux** (centralité, composantes, densité), `igraph` ou `statnet` sont les plus robustes.
+  * Pour **des visualisations modernes et esthétiques**, utilisez `ggraph` (statique) ou `visNetwork`/`networkD3` (interactives).
+  * Pour un **flux de travail “tidyverse”**, `tidygraph` avec `ggraph` est la solution la plus cohérente.
+  * Pour des **réseaux temporels ou dynamiques**, `ndtv` et `tsna` sont les références.
+  * Pour l'intégration dans des applications **Shiny ou dashboards interactifs**, privilégier `visNetwork` ou `networkD3`.
+
+# Réseaux bipartites 
+
+Tableau comparatif des packages et fonctions pour l'analyse des réseaux bipartites : 
+
+| Package     | Utilité principale                                      | Exemples                      |
+| ----------- | ------------------------------------------------------- | ----------------------------- |
+| `igraph`    | Manipuler, projeter, calculer degrés                    | `bipartite_projection()`      |
+| `bipartite` | Analyse écologique, indices de structure, visualisation | `networklevel()`, `plotweb()` |
+| `tnet`      | Mesures complexes bipartites, redondance, poids         | `degree_tm()`                 |
+| `statnet`   | Modélisation statistique des liens bipartites           | `ergm()`                      |
+
+# Détection de commuautés 
+
+Voici un tableau comparatif des différents algorithmes disponibles avec **igraph**
+
+| Nom de l’algorithme      | Fonction `igraph`          | Méthode / Principe                      | Graphe requis        | Pondération | Dirigé | Résolution | Avantages principaux                           | Limites / Inconvénients                              | Cas d’usage recommandés                     |
+| ------------------------ | -------------------------- | --------------------------------------- | -------------------- | ----------- | ------ | ---------- | ---------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
+| **Louvain**              | `cluster_louvain`          | Optimisation de modularité              | Non-dirigé           | Oui         | Non    | Moyenne    | Rapide, efficace sur grands graphes            | Résolution limitée (fusionne petites communautés)    | Réseaux sociaux, grands graphes non dirigés |
+| **Infomap**              | `cluster_infomap`          | Théorie de l’information / Flux         | Dirigé ou non-dirigé | Oui         | Oui    | Élevée     | Bonne détection de petites communautés         | Moins rapide que Louvain sur très grands graphes     | Flux de navigation, graphes dirigés         |
+| **Walktrap**             | `cluster_walktrap`         | Random Walk                             | Non-dirigé           | Oui         | Non    | Moyenne    | Stable, bonne précision                        | Plus lent, mauvaise scalabilité                      | Réseaux de proximité, co-citations          |
+| **Label Propagation**    | `cluster_label_prop`       | Propagation d’étiquettes                | Non-dirigé           | Non         | Non    | Basse      | Très rapide, sans paramètre                    | Non déterministe, instable                           | Graphes massifs, explorations rapides       |
+| **Edge Betweenness**     | `cluster_edge_betweenness` | Suppression d’arêtes centrales          | Non-dirigé           | Oui         | Non    | Élevée     | Intuitif, qualitatif sur petits graphes        | Complexité élevée (O(n^3)), peu scalable             | Petits graphes, visualisation pédagogique   |
+| **Fast Greedy**          | `cluster_fast_greedy`      | Fusion hiérarchique (greedy modularity) | Non-dirigé           | Oui         | Non    | Moyenne    | Plus rapide que Betweenness                    | Moins précis sur certains types de structures        | Réseaux hiérarchiques, agrégation simple    |
+| **Spinglass**            | `cluster_spinglass`        | Modèle d’Ising (physique statistique)   | Dirigé ou non-dirigé | Oui         | Oui    | Ajustable  | Paramétrable, efficace avec pondérations       | Nécessite configuration fine, lent                   | Graphes pondérés ou orientés complexes      |
+| **Leading Eigenvector**  | `cluster_leading_eigen`    | Décomposition spectrale                 | Non-dirigé           | Non         | Non    | Moyenne    | Basé sur algèbre linéaire, relativement rapide | Moins performant que Louvain sur très grands graphes | Analyse mathématique, structures spectrales |
+| **Multilevel (Louvain)** | `cluster_louvain`          | Variante de Louvain                     | Non-dirigé           | Oui         | Non    | Moyenne    | Rapide et efficace pour les grands réseaux     | Même limite de résolution que Louvain                | Réseaux massifs sans direction              |
+
+
+<br>
+
+**Comment choisir ?**  
+
+| Objectif principal                    | Algorithmes conseillés                           |
+| ------------------------------------- | ------------------------------------------------ |
+| Vitesse / scalabilité                 | **Label Propagation**, **Louvain**               |
+| Petites communautés / détails fins    | **Infomap**, **Spinglass**, **Edge Betweenness** |
+| Résultats stables et interprétables   | **Walktrap**, **Fast Greedy**                    |
+| Visualisation pédagogique             | **Edge Betweenness**, **Leading Eigenvector**    |
+| Graphes dirigés / flux d’information  | **Infomap**, **Spinglass**                       |
+| Graphes pondérés avec forte structure | **Spinglass**, **Louvain**, **Fast Greedy**      |

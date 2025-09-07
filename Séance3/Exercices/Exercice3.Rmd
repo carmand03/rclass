@@ -1,0 +1,59 @@
+---
+title: "Séance 3 : Exercice"
+author: "Cécile Armand"
+date: "2025-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Objectifs 
+
+Cet exercice a pour objectif de vous familiariser avec l’analyse de réseaux sous R et de mettre en pratique les méthodes présentées lors de la 3ᵉ séance.
+
+Le jeu de données proposé est une liste d’individus avec les associations auxquelles ils appartiennent. Il s’agit donc d’un réseau d’affiliation de type bipartite. L’enjeu est d’identifier d’éventuels « patterns » d’affiliation, tels que :
+
+  * des individus partageant les mêmes organisations,
+  * des combinaisons d’organisations plus fréquentes que d’autres,
+  * des sous-groupes ou communautés fondés sur ces affiliations.
+
+Il faut garder à l’esprit que l’affiliation ne constitue qu’un lien indirect : elle n’implique pas nécessairement d’interaction sociale. Toutefois, on fait l’hypothèse que les individus appartenant aux mêmes organisations ont davantage de chances de se rencontrer, ou, à défaut, de partager des centres d’intérêt communs.
+
+ Les données sont tirées de l'annuaire d'étudiants chinois aux Etats-Unis paru en 1917 (*Who's Who of American returned students*), que nous avons déjà introduit pour le première exercice.
+ 
+## Charger les données  
+
+1. Chargez le ficher *association.csv* et inspecter les données. 
+2. Créer la lite de liens (simplifiée).
+3. Créer la liste de noeuds (distinguer étudiants et organisations). 
+
+## Réseau bipartite
+
+  1. Chargez le package igraph
+  2. Convertir la liste de liens en graphe bipartite
+  3. Visualiser le graph bipartite en distinguant les étudiants et les associations par une couleur et/ou une forme différente. 
+  4. Calculer les centralités en pondérant selon la nature des noeuds. Quels sont les individus et les associations les plus centrales dans le réseau ? Comment peut-on interpréter les résultats ?
+  5. Visualisez le graphe de manière à mettre en valeur les étudiants et les associations les plus centrales (ajuster la taille des noeuds et des étiquettes).
+  
+## Projections 
+
+  1. Projetez le réseau bipartite étudiants-associations en deux réseaux directs étudiants-étudiants et associations-associations.
+  2. Visualisez les deux nouveaux réseaux en utilisant des couleurs ou des formes  différentes.
+  3. Calculez et comparez les mesures globales pour chaque réseau (ordre, diamètre, densité, etc)
+  4. Calculez les centralités pour chaque réseau. Comparer avec les centralités pondérées issues du réseau bipartite. 
+  5. Recherchez des communautés d'étudiants et d'organisations. Testez différents alglorithmes et comparez les résultats obtenus. 
+  
+## Recherche d'équivalences 
+
+  1. Chargez le package "Places"
+  2. Identifiez les étudiants qui occupent des positions équivalentes dans le réseau (appliquez la fonction place()). 
+  3. Projetez le réseau bipartite *places-associations* en deux réseaux directs de places-places (liées par les associations) et associations-associations (liées par les places). 
+  4. Examinez le poids des liens dans les deux réseaux. Quels sont les liens les plus forts ? A quoi correspondent-ils ? 
+  5. Calculez les centralités pour chaque réseau. Comparez avec les centralités calculées précédemments. Qu'observez-vous ? 
+  6. Recherchez les communautés en appliquant les mêmes algorithmes que précédemment et comparez les résultats. 
+
+
+  
+

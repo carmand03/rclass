@@ -1,0 +1,1329 @@
+---
+title: "Séance 3 : Analyse de réseaux avec R"
+author: "Cécile Armand"
+date: "2025-10-15"
+
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    number_sections: false
+    code_folding: show # hide
+    fig_caption: true
+    df_print: paged
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(Places)
+library(knitr)
+library(kableExtra)
+
+```
+
+```{r message = FALSE, warning = FALSE, echo=FALSE}
+
+load("~/RClass/Cours3/Cours3.RData")
+
+```
+
+
+# Introduction 
+
+## Objectifs 
+
+Cette séance à pour objectif d'introduire les principaux concepts de l'analyse formelle de réseau et de se familiariser avec ses méthodes, en particulier : 
+
+  * les **mesures globales** permettant d'analyser la structure du réseau (e.g., ordre, diamètre, densité) (niveau macro) ; 
+  * les **mesures locales** (centralités) permettant d'analyser la position des noeuds dans le réseau (e.g., degré, intermédiarité) (niveau micro) ; 
+  * la **détection de communautés** permettant d'identifier des sous-groupes de noeuds plus densément connectés à l'intérieur du réseau (au niveau meso) ;
+  * l'analyse des **liens**, souvent négligées (poids, attributs). 
+
+La troisième section introduira la notion **d'équivalence structurale** ou **régulière** qui vise à identifier les entités (acteurs ou autres) qui occupent une position équivalente dans un réseau. Cette méthode est particulièrement intéressante pour analyser les réseaux bipartites. 
+
+Ce tutoriel s'appuie principalement sur le package [**igraph**](https://igraph.org/), l'un des plus populaires pour l'analyse et la visualisation de réseau avec R. Pour la recherche d'équivalence, nous utiliserons le package **Places** dédiée spécifiquement à ce type d'analyse. 
+
+## Organisation de la séance 
+
+Dans cette séance, nous aborderons d'abord les réseaux simples (unimodes) puis les réseaux bipartites. Nous nous appuierons sur deux jeux de données issus des séances précédentes : 
+
+  1. Pour les **réseaux simples**, nous réutiliserons le **réseau de co-occurrences** extrait du corpus d’articles de presse portant sur Lyon (séance 2). 
+  2. Pour les **réseaux bipartites**, nous reprendrons le jeu de données **auc** consacré aux *alumni* des universités américaines (séance 1)
+
+Ces deux cas très différents illustrent la diversité des applications possibles de l’analyse de réseaux : réseau de mots dans le premier cas, réseau d'acteurs sociaux (individuels ou collectifs) dans le deuxième cas. Ils permettent aussi de couvrir les deux principaux formats sources possibles (matrice dans le premier cas, *edge list* dans le second). Nous verrons aussi comment passer d'un format à l'autre avec *igraph*. 
+
+## Préparer ses données : *edge list* ou matrice ?
+
+L'analyse de réseau traite des données relationnelles. Ces données relationnelles peuvent être structurées soit sous forme de **matrices**, soit sous forme de **liste de liens** (*edge list*) (souvent la plus commune).
+
+Le package **igraph** offre différentes fonctions qui permettent de passer d'un format à l'autre :
+
+
+| Format source          | Fonction                            | Format cible      |
+| ---------------------- | ----------------------------------- | ----------------- |
+| matrice d’adjacence    | `graph_from_adjacency_matrix()`     | graphe            |
+| graphe                 | `as_adjacency_matrix()`             | matrice           |
+| edge list (matrice)    | `graph_from_edgelist()`             | graphe            |
+| edge list (data.frame) | `graph_from_data_frame()`           | graphe            |
+| graphe                 | `as_edgelist()` / `as_data_frame()` | edge list         |
+| graphe                 | `as_adj_list()`                     | liste d’adjacence |
+| liste d’adjacence      | `graph_from_adj_list()`             | graphe            |
+
+
+
+# 1. Réseaux simples
+
+Notre point de départ est la matrice des co-occurrences (les mots qui apparaissent le plus souvent ensemble dans les articles de presse qui portent sur Lyon) construite avec **quanteda** lors de la séance 2. Comme la matrice d'origine est énorme et gourmande en stockage, on l'a reduite pour ne conserver que les co-occurrences concernant les 100 termes les plus fréquents (*fcmat_redux*). 
+
+## Convertir une matrice en graphe
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+g1 <- fcmat_redux %>%
+  as.matrix() %>%
+  graph_from_adjacency_matrix(mode = "max", weighted = TRUE, diag = FALSE)
+
+```
+<br>
+**Explication ligne à ligne** :
+
+  * `g1 <-` : On crée un **objet nommé `g1`** qui contiendra un graphe (graph object). L’opérateur `<-` affecte à `g1` le résultat des opérations effectuées à droite.
+  * `fcmat_redux` : On part de l'objet nommé `fcmat_redux` (la **matrice de co-occurrences** construite avec **quanteda** dans la séance 2, qui représente les co-occurrences des mots dans le corpus Lyon). Comme on l'a vu dans la première séance, le symbole `%>%` est un **pipe** (fourni par `dplyr` ou `magrittr`) qui permet d’enchaîner les opérations de manière lisible : le résultat de cette ligne sera passé à la ligne suivante comme premier argument.
+  * `as.matrix()` : On convertit `fcmat` en matrice classique de type `matrix`. Comme une `fcm` de quanteda n'est pas une vraie matrice R, il est nécessaire de la transformer. Cela permet de s'assurer que l’objet est bien au format attendu pour la fonction suivante (`graph_from_adjacency_matrix`). 
+  * `graph_from_adjacency_matrix()` : la fonction **graph_from_adjacency_matrix()** du package **igraph** permet de créer un **graphe** à partir de cette matrice. On définit les paramètres suivants : 
+  * `mode = "undirected"` : le graphe sera **non orienté** (les relations vont dans les deux sens, comme pour des co-occurrences entre mots). Note : dans la version 1.6.O d'igraph, on utilise `mode = "max"` pour forcer la symétrie si la matrice n'est pas parfaitement symétrique (ce qui est le cas ici, ce qui est dû au fait que nous travaillons sur une version réduite de la matrice). 
+  * `weighted = TRUE` : les **poids** de la matrice (le nombre de fois que deux mots co-apparaissent) seront utilisés comme **poids des arêtes (liens)**.
+  * `diag = FALSE` : on ignore la **diagonale** de la matrice, ce qui revient à éliminer les boucles entre un nœud et lui-même (*self-loops*), autrement, il n'y aura pas de lien d’un mot avec lui-même.
+
+Le résultat final est un objet `g1` de type **igraph**, représentant un graphe non orienté et pondéré construit à partir des co-occurrences dans `fcmat`.
+
+<div class="alert alert-success" role="alert">
+**Bon à savoir**
+Pour convertir le graphe en dataframe et l'exporter pour le projeter dans un logiciel de type Gephi ou Cytoscape, on peut utiliser la fonction **as_data_frame** fourni par **igraph** et ensuite sauvegarder la liste de liens  sous forme de fichier csv: 
+
+```{r warning = FALSE, message = FALSE}
+
+g1_edgelist <- as_data_frame(g1, what = "edges")
+
+head(g1_edgelist) 
+
+```
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+write.csv(g1_edgelist, "g1_edgelist.csv")
+
+```
+</div>
+
+## Inspecter 
+
+Commençons par inspecter l'objet graphe que l'on vient de créer : 
+```{r warning = FALSE, message = FALSE}
+
+g1
+
+```
+<br>
+Ce qu'on voit ici est une **description succincte** d’un objet `igraph`, affichée automatiquement lorsqu'on tape son nom dans la console (juste `g1` ou `print(g1)` ou encore `summary(g1)`). Décryptons-la ligne à ligne :
+
+  * `IGRAPH` : indique que c’est un objet de type `igraph`.
+  * `117182a` : un identifiant unique de l’objet en mémoire (on peut l'ignorer).
+  * `UNW-` : un code abrégé qui résume les caractéristiques structurelles du graphe : 
+    * `U` = **Undirected** → le graphe est **non orienté**
+    * `N` = **Named** → les nœuds ont un attribut `name`
+    * `W` = **Weighted** → les arêtes ont un attribut `weight`
+    * `-` = pas d’autre propriété notable (ex. pas de multiple edges, pas de loops...)
+  * Le réseau contient 100 noeuds (les 100 mots les plus fréquents) et 4347 liens 
+  * Les attributs associés aux noeuds et aux liens sont les suivants : 
+    * `name (v/c)` : le nom des noeuds (v = vertice), sous forme d'un vecteur de type caractère (`c` = character).
+    * `weight (e/n)` : le poids des liens sous forme d'un vecteur numérique (`n` = numeric).
+
+En résumé, ce graphe `g1` est un graphe non orienté composé de 100 noeuds et 4347 liens. Chaque nœud porte un nom (`name`) et chaque lien a un poids (`weight`).
+
+## Visualiser (1) 
+
+Même si voir n'est pas démontrer, il peut être utile de visualiser le graphe afin d'avoir une première intuition de sa structure. 
+
+```{r warning = FALSE, message = FALSE}
+
+plot(g1)
+
+```
+<br>
+Le résultat n'est pas formidable. On va tenter d'améliorer la lisibilité et l'esthétique du graphe en changeant la couleur des noeuds, la position et la couleur des étiquettes, le layout. Nous allons aussi ajouter un titre : 
+```{r warning = FALSE, message = FALSE}
+
+plot(g1, vertex.size = 7, 
+     vertex.color = "steelblue", 
+     vertex.label.color = "black",
+     vertex.label.cex = 0.7,
+     vertex.label.dist = 1, 
+     layout = layout_with_drl,
+     main="Réseau de co-occurrences")
+
+```
+<br>
+**Décryptage**
+
+  * g1 : objet igraph représentant le graphe à tracer.
+  * vertex.size = 7 : taille des nœuds ; ici, taille moyenne pour bonne visibilité.
+  * vertex.color = "steelblue" : couleur de remplissage des nœuds (bleu acier).
+  * vertex.label.color = "black" : couleur du texte des étiquettes des nœuds (noir, pour bonne lisibilité).
+  * vertex.label.cex = 0.7 : taille du texte des étiquettes (70 % de la taille standard).
+  * vertex.label.dist = 1 : distance entre l’étiquette et le nœud ; éloigne le texte pour éviter le chevauchement.
+  * layout = layout_with_drl : algorithme de mise en page DRL (Distributed Recursive Layout), efficace pour les grands graphes ou réseaux éclatés.
+  * main = "Réseau de co-occurrences" : titre du graphe, affiché en haut de la figure.
+<br>
+
+<div class="alert alert-success" role="alert"> 
+**Bon à savoir**
+
+1. Pour obtenir la **liste des couleurs** diponibles dans R : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+colors()
+
+```
+<br>
+
+2. Pour obtenir la **liste des layouts** diponibles dans **igraph**: 
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+ls("package:igraph", pattern = "^layout_")
+
+```
+<br>
+Comparons différents layouts sur notre réseau: 
+```{r warning = FALSE, message = FALSE}
+
+# Préparer une grille 3x3
+par(mfrow = c(3, 3), mar = c(1, 1, 3, 1))  # marges réduites
+
+# Layout 1 : Fruchterman-Reingold
+plot(g1, layout = layout_with_fr(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Fruchterman-Reingold")
+
+# Layout 2 : Kamada-Kawai
+plot(g1, layout = layout_with_kk(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Kamada-Kawai")
+
+# Layout 3 : DRL (Distributed Recursive Layout)
+plot(g1, layout = layout_with_drl(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "DRL")
+
+# Layout 4 : Cercle
+plot(g1, layout = layout_in_circle(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Cercle")
+
+# Layout 5 : Aléatoire
+plot(g1, layout = layout_randomly(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Aléatoire")
+
+# Layout 6 : Arborescent
+plot(g1, layout = layout_as_tree(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Arbre")
+
+# Layout 7 : Grille
+plot(g1, layout = layout_on_grid(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Grille")
+
+# Layout 8 : LGL (Large Graph Layout)
+plot(g1, layout = layout_with_lgl(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "LGL")
+
+# Layout 9 : Graphopt
+plot(g1, layout = layout_with_graphopt(g1), 
+     vertex.size = 4, vertex.label = NA, 
+     vertex.color = "steelblue", 
+     main = "Graphopt")
+
+par(mfrow = c(1, 1)) # supprimer la grille 
+
+```
+</div>
+
+<br>
+
+On va maintenant étayer ces intuitions en utilisant différents outils de mesures globales et locales fournis par le package **igraph**.
+
+## Mesures globales 
+
+Différentes mesures existent pour décrire la structure d'un graphe dans sa globalité. Nous verrons ici les plus couramment utilisées. Pour une liste détaillée, voir l'aide-mémoire et la documentation du package **igraph**  
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+gorder(g1) # nombre de noeuds (order)
+gsize(g1) # nombre de liens (size)
+diameter(g1) # diamètre
+mean_distance(g1) # distance moyenne entre les noeuds
+edge_density(g1) # densité du graphe
+transitivity(g1) # transitivité
+components(g1) # nombre de composantes connexes
+is_connected(g1) # le graphe est-il connexe ?
+
+```
+<br>
+**Note**
+Ces mesures globales sont souvent utiles pour comparer des réseaux (ici par exemple, les réseaux sémantiques issus de différents corpus ou différentes sources), mais en soi elles sont peu informatives et difficiles à interpreter isolément.
+
+## Mesures locales (centralités) 
+
+Les mesures de centralité servent à mesurer la position d'un noeud dans un réseau. De nombreuses mesures de centralité peuvent être calculées avec igraph. Les plus couramment utilisées sont mises en oeuvre dans le code ci-dessous. Pour une liste plus détaillée, voir le tableau ci-dessous : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Degré
+degree(g1)
+degree(g1, normalized = TRUE) # degré normalisé : utile pour comparer des graphes de tailles différentes
+
+# Intermédiarité
+betweenness(g1)
+
+# Proximité
+closeness(g1)
+
+# Eigenvector
+eigen_centrality(g1)$vector
+
+# PageRank
+page_rank(g1)$vector
+
+
+```
+
+<br>
+**Liste détaillée**
+
+| Centralité                       | Fonction `igraph`                   | Description                                                                                    |
+| -------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Degré**                        | `degree()`                          | Nombre d'arêtes connectées à un sommet (entrantes, sortantes ou totales).                      |
+| **Intermédiarité (nœuds)**       | `betweenness()`                     | Compte le nombre de plus courts chemins passant par un sommet.                                 |
+| **Intermédiarité (arêtes)**      | `edge_betweenness()`                | Compte le nombre de plus courts chemins passant par une arête.                                 |
+| **Proximité**                    | `closeness()`                       | Inverse de la somme des distances d’un sommet aux autres (plus petite = plus central).         |
+| **Éigenvector (valeur propre)**  | `eigen_centrality()`                | Tient compte non seulement du nombre de voisins, mais aussi de leur influence.                 |
+| **Centralité de Katz**           | `alpha_centrality()`                | Variante pondérée de la centralité de degré, intégrant les chemins indirects (et orientés).    |
+| **Centralité de Bonacich**       | `power_centrality()`                | Généralisation de la centralité de Katz avec paramètre d’influence.                            |
+| **PageRank**                     | `page_rank()`                       | Modélise la probabilité de visite d’un sommet par un "surfeur aléatoire" (comme Google).       |
+| **Rayonnement (hub/authority)**  | `hit_scores()` | Score des hubs (émetteurs forts) et des autorités (récepteurs forts), selon l’algorithme HITS. |
+| **Rayonnement total (directed)** | `subgraph_centrality()`             | Nombre de sous-graphes auxquels un nœud participe (rarement utilisé car coûteux).              |
+
+<div class="alert alert-danger" role="alert"> 
+**Remarques importantes**
+
+  1. Pour les graphes orientés, plusieurs fonctions prennent **mode = "in"**, **"out"** ou **"all"**.
+  2. Certaines mesures sont sensibles aux composantes connexes : si le graphe est non connexe, les mesures de **betweeneness()** et **closeness()** peuvent retourner des valeurs biaisées.</div>
+  3. Certaines mesures comme **hub/authority** ne s'appliquent que dans les réseaux orientés.
+
+
+Pour combiner ces différentes mesures dans un seul dataframe et les exporter au format csv, on peut appliquer le code suivant : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Calcul des différentes centralités
+
+g1_centrality <- data.frame(
+  node = V(g1)$name,
+  degree = degree(g1),
+  degree_norm = degree(g1, normalized = TRUE),
+  betweenness = betweenness(g1),
+  closeness = closeness(g1),
+  eigenvector = eigen_centrality(g1)$vector,
+  pagerank = page_rank(g1)$vector)
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# Afficher un aperçu
+
+g1_centrality %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Exporter au format CSV
+
+write.csv(g1_centrality, "g1_centrality_measures.csv", row.names = FALSE)
+
+```
+
+
+## Mesures sur les liens 
+
+Les deux principales mesures sont le poids des liens (si le réseau est valué) et leur intérmédiarité. 
+
+```{r warning = FALSE, message = FALSE}
+
+head(table(E(g1)$weight)) # table des poids
+
+```
+<br>
+On peut utiliser cette table pour filtrer les liens en fonction de leur poids : 
+```{r warning = FALSE, message = FALSE}
+
+head(E(g1)[weight > 1]) # tous les liens dont le poids est supérieur à 1 
+
+E(g1)[weight == 100] # tous les liens qui ont un poids de 100 (connectant tous les noeuds)
+
+```
+<br>
+L’intermédiarité d'un lien ou arête mesure combien de fois cette arête est empruntée par les plus courts chemins reliant tous les couples de nœuds dans le graphe. Autrement dit, une arête avec une valeur élevée se trouve souvent sur les plus courts chemins → elle connecte des groupes ou des régions du réseau. C’est une arête "stratégique" ou "pont" entre communautés ou clusters (c'est l'équivalent pour les liens de l'intermédiarité des noeuds). La fonction **edge_betweenness()** sert à la calculer : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+edge_betweenness(g1) # intermédiarité des liens
+
+```
+<br>
+
+
+## Visualiser (2) 
+
+On peut intégrer ces informations les noeuds et les liens directement dans la visualisation du graphe. On peut par exemple : 
+
+  - Indexer la taille des noeuds (et des étiquettes) sur leur centralité 
+  - Indexer l'épaisseur des liens sur leur poids 
+  
+### Centralités
+
+Par exemple, on visualise l'eigenvector des noeuds : 
+```{r message = FALSE, warning = FALSE}
+
+plot(g1, vertex.size = eigen_centrality(g1)$vector*10,
+     vertex.color = "steelblue", 
+     vertex.label.color = "black",
+     vertex.label.cex = eigen_centrality(g1)$vector,
+     vertex.label.dist = 1, 
+     layout = layout_with_drl,
+     main="Réseau de co-occurrences\nTaille = eigenvector")
+
+```
+
+
+### Poids des liens
+
+Pour changer **l'apparence des liens** (épaisseur, couleur, inflexion) : 
+
+```{r warning = FALSE, message = FALSE}
+
+plot(g1, 
+     vertex.size = eigen_centrality(g1)$vector * 10, 
+     vertex.color = "steelblue", 
+     vertex.frame.width = 0.5,           # épaisseur fine des noeuds
+     vertex.label.color = "black",
+     vertex.label.cex = eigen_centrality(g1)$vector,
+     edge.width = log(E(g1)$weight) * 0.025,  
+     edge.curved = 0.8,    
+     edge.color = "grey40",  
+     layout = layout_with_fr,
+     main = "Réseau de co-occurrences")
+
+```
+
+
+## Détection de communautés 
+
+La notion de **communauté** (ou *cluster*) en analyse de réseau désigne un sous-ensemble de nœuds plus densément connectés entre eux qu’avec le reste du réseau. La détection de communautés offre une échelle d’analyse intermédiaire (méso), qui se situe entre l’échelle globale du réseau (macro) et celle locale des nœuds individuels ou des dyades (paires de nœuds).
+
+Il existe différentes méthodes pour détecter des communautés, qui renvoient à différentes manières de partitionner le réseau. Aussi le choix de la méthode aura un impact sur la partition finale. 
+
+L'avantage d'utiliser R pour la détection de communautés est de pouvoir tester et comparer différents algorithmes et d'en maîtriser pleinement les paramètres. 
+
+Nous allons voir dans cette section : 
+
+  1. Comment choisir et appliquer un algorithme avec **igraph**
+  2. Comment extraire les membres des communautés, calculer leur taille et leur attribuer un label.
+  3. Comment visualiser les communautés et les liens intra- et inter-communautés.
+
+### Choix de l'algorithme 
+
+La liste des algorithmes de détection de communauté fourni par **igraph** peut être consultée dans la [documentation](https://igraph.org/r/html/1.2.3/communities.html) du package igraph. On peut aussi les lister directement en appliquant ce code :  
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Lister tous les algorithmes de détection de communautés disponibles avec igraph
+
+community_algos <- ls("package:igraph", pattern = "^cluster_")
+print(community_algos)
+
+```
+<br>
+Comment choisir le bon algorithme ? L'aide-mémoire qui accomapgne ce cours fournit un tableau comparatif et des conseils pour aider à faire son choix. 
+
+A titre d'exemple, nous choisissons ici de comparer deux algorithmes : *louvain* et *infomap* :
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+set.seed(2025) # pour stabiliser les résultats
+com_louvain <- cluster_louvain(g1)
+com_infomap <- cluster_infomap(g1)
+
+```
+<br>
+**Décryptage** : 
+
+La première ligne (set.seed) fixe la graine du générateur aléatoire pour rendre les résultats reproductibles. Certains algorithmes de détection de communautés (comme Infomap ou Label Propagation) incluent des étapes aléatoires (par exemple : initialisation aléatoire, propagation aléatoire, etc.). En fixant une graine (ici 2025, mais on peut choisir un autre nombre tout à fait aléatoire), on s'assure que les résultats obtenus seront les mêmes à chaque exécution du script, ce qui est utile pour comparer des résultats de manière stable, déboguer ou partager du code avec d'autres, écrire des articles ou rapports scientifiques reproductibles.
+
+Les lignes suivantes appliquent successivement les deux algorithmes choisis (cluster_louvain, cluster_infomap) au réseau (g1) et stockent chaque résultats dans une nouvelle variable (com_louvain, com_infomap). 
+
+### Inspecter les résultats
+
+```{r warning = FALSE, message = FALSE}
+
+print(com_louvain)
+print(com_infomap)
+
+```
+<br> 
+La fonction **print()** (on peut aussi simplement entrer *com_louvain* et *com_infomap* dans la console) indique le nombre de communautés détectées dans chaque cas, leur taille et le score de modularité, qui mesure le degré de partitionnement. La modularité quantifie à quel point les nœuds d’une même communauté sont plus densément connectés entre eux qu’avec le reste du réseau. 
+
+| Valeur de `mod.` | Interprétation générale                             |
+| ---------------- | --------------------------------------------------- |
+| ≈ 0              | Pas de structure communautaire détectée             |
+| 0.3 – 0.5        | Structure communautaire modérée                     |
+| > 0.5            | Structure communautaire forte                       |
+| > 0.7            | Rare ; très forte modularité (souvent artificielle) |
+
+
+<div class="alert alert-danger" role="alert">
+**À noter** 
+Bien que le score de modularité soit souvent utilisé pour mesurer la qualité des résultats, une modularité élevée n’est pas toujours un gage de qualité (effet de résolution, surpartition). Il est important de la combiner avec d’autres analyses visuelles ou structurales.</div>  
+
+```{r warning = FALSE, message = FALSE}
+
+# taille des communautés 
+
+table(sizes(com_louvain))
+table(sizes(com_infomap))
+
+```
+
+### Extraire les communautés
+
+Nous allons maintenant extraire les communautés sous forme de dataframe. Cela permet de mieux les examiner et les caractériser : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Louvain 
+
+df_louvain <- data.frame(node = V(g1)$name,
+                         membership = membership(com_louvain),
+                         method = "Louvain") %>% 
+  group_by(membership) %>% add_tally(name = "size") # on ajoute la taille de chaque communauté
+
+# Infomap 
+
+df_infomap <- data.frame(node = V(g1)$name,
+                         membership = membership(com_infomap),
+                         method = "Infomap") %>% 
+  group_by(membership) %>% add_tally(name = "size") # # on ajoute la taille de chaque communauté
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+head(df_louvain)
+head(df_infomap)
+
+```
+
+
+### Visualiser 
+
+Nous allons maintenant visualiser les communautés au sein du réseau en leur appliquant une coleur différente : 
+
+```{r warning = FALSE, message = FALSE}
+
+V(g1)$color <- com_louvain$membership
+
+plot(g1,
+     vertex.label = NA,
+     vertex.size = 10,
+     main = "Communautés détectées (Louvain)",
+     layout = layout_with_fr(g1))
+
+
+```
+<br>
+On peut visualiser liens intra- et inter-communautés en attribuant à chaque noeud un groupe qui correspond au numéro de la communauté à laquelle il appartient :  
+```{r warning = FALSE, message = FALSE}
+
+V(g1)$group <- com_louvain$membership
+
+plot(com_louvain, g1, 
+     vertex.label=NA,
+     vertex.size=10,
+     main="Communautés détectées (Louvain)")
+
+```
+<br>
+Les liens intra-communuautaires sont représentés en noir, les liens entre communautés figurent en rouge.
+
+### Sous-graphes
+
+Comme le graphe global est difficilement lisible, il peut être utile d'extraire les communautés sous forme de graphes individuels pour mieux les observer. Par exemple ici on extrait les communautés 1 et 5 détectées avec Louvain (on pourrait extraire les autres de la même manière) : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+louvain1 <- induced_subgraph(g1, V(g1)$group==1)  
+louvain5 <- induced_subgraph(g1, V(g1)$group==5) 
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+
+plot(louvain1, vertex.label=V(g1)$id,
+     vertex.label.color = "black", 
+     vertex.label.cex = 0.8, 
+     vertex.size= 8,
+     vertex.label.dist = 1.2, 
+     main="Communauté 1 (Louvain)")
+
+plot(louvain5, vertex.label=V(g1)$id,
+     vertex.label.color = "black", 
+     vertex.label.cex = 0.8, 
+     vertex.size= 8,
+     vertex.label.dist = 1.2, 
+     main="Communauté 5 (Louvain)")
+
+```
+
+
+### A vous ! 
+
+  1. Visualisez les communautés détectées avec Infomap.
+  2. Testez d'autres algorithmes.
+  3. Comparez et interprétez les résultats obtenus.
+
+# 2. Réseaux bipartites 
+
+A la différence du réseau précédent, pour lequel nous sommes partis d'une matrice, le réseau des étudiants est founie sous la forme d'une liste de liens (*edge list*) de type *dataframe*. Plus précisément, les liens d'affiliations entre les alumni et les universités où ils ont étudié.
+
+Dans le cas d'un réseau bipartite, on fournit aussi une liste de noeuds (*node list*), également sous forme de *dataframe*, pour différencier les deux types d'entités présentes dans le réseau (étudiants et université). 
+
+<div class="alert alert-success" role="alert"> 
+**Bon à savoir** 
+En plus de la liste de liens et de noeuds, on peut éventuellement fournir une liste d'attributs apportant des informations complémentaires sur les noeuds, par exemple la nationalité des étudiants ou la localisation des universités. Ces informations peuvent être utiles pour filtrer le réseau ou interpréter les résultats de l'analyse de réseau, mais ne sont pas requis pour sa construction.
+Le seul élément indispensable à la construction du réseau est la liste de liens. Sans liens, pas de réseau !
+</div> 
+
+## Créer la liste de liens et de noeuds
+
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+# charger le jeu de données
+
+library(readr)
+auc <- read_delim("Data/auc.csv", delim = ";", 
+                  escape_double = FALSE, trim_ws = TRUE)
+
+# créer la liste de liens
+
+auc_edge <- auc %>% transmute(Student = Name_full, University)
+
+# créer la liste de noeuds 
+
+student_node <- auc_edge %>% distinct(Student) %>% rename(Name = Student) %>% mutate(Type = "Student")
+univ_node <- auc_edge %>% distinct(University) %>% rename(Name = University) %>% mutate(Type = "University")
+auc_node <- bind_rows(student_node, univ_node)
+
+
+```
+
+<br>
+<div class="alert alert-success" role="alert"> 
+**Note**
+Si l'on veut intégrer les attributs des liens, par exemple la date ou la nature du diplôme, pour pouvoir filtrer et créer des sous-réseaux par période ou niveau de diplôme, on peut sélectionner les attributs désirés au moment où l'on crée la liste de liens : 
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+auc_edge_att <- auc %>% transmute(Student = Name_full, University, 
+                                  Degree = Degree_level, Field = Field_main, 
+                                  Year = Year_start)
+```
+<br>
+De même, si l'on souhaite ajouter des attributs aux noeuds, on peut les stocker dans un dataframe à part : 
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+# créer une liste d'attributs sur les noeuds (facultatif)
+
+student_att <- auc %>% transmute(Name = Name_full, Nationality) %>% unique()
+
+```
+</div>
+
+## Convertir une liste de liens en graphe 
+
+On utilise la fonction **graph_from_data_frame()** pour transformer notre liste de liens en graphe. On utilise l'argument **vertices =** pour spécifier la liste de noeuds : 
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+g2 <- graph_from_data_frame(auc_edge, vertices = auc_node, directed = FALSE)
+
+```
+<br>
+Pour indiquer à **igraph** qu'il s'agit d'un réseau bipartite avec deux types de noeuds (des étudiants et des universités), on crée une variable logique (TRUE pour Student, FALSE pour University)
+```{r warning = FALSE, message = FALSE, eval=FALSE}
+
+V(g2)$type <- V(g2)$Type == "Student"
+
+```
+<br>
+On vérifie que le graphe est bipartite :  
+```{r warning = FALSE, message = FALSE}
+
+is_bipartite(g2)  # Doit renvoyer TRUE
+
+```
+<br>
+Inspectons le réseau final 
+```{r warning = FALSE, message = FALSE}
+
+g2
+
+```
+
+## Visualiser un réseau bipartite
+
+```{r warning = FALSE, message = FALSE}
+
+# Définir les couleurs : par exemple, bleu pour les étudiants, rouge pour les universités
+
+V(g2)$color <- ifelse(V(g2)$type, "skyblue", "tomato")
+
+# Définir les formes : cercle pour étudiants, carré pour universités
+
+V(g2)$shape <- ifelse(V(g2)$type, "circle", "square")
+
+
+# Tracer le graphe en comparant deux layouts différents 
+
+plot(g2, vertex.size = 5, vertex.label = NA, layout = layout_with_fr)
+plot(g2, vertex.size = 5, vertex.label = NA, layout = layout_as_bipartite)
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+# ajuster la taille des noeuds et des étiquettes pour les rendre proportionnelles au degré de centralité 
+
+plot(g2, vertex.size = degree(g2)*0.25, 
+     vertex.label.cex = degree(g2)*0.025, 
+     vertex.label.color = "black", 
+     layout = layout_with_fr)
+
+```
+
+## Centralités
+
+Les mesures de centralité classiques (comme la centralité de degré, d’intermédiarité, de proximité, ou eigenvector) s’appliquent souvent mal aux réseaux bipartites, car elles reposent sur des hypothèses implicites incompatibles avec la structure particulière de ces réseaux. 
+
+Prenons l'exemple de la mesure d'intermédiarité (betweenness) qui mesure combien de fois un nœud est sur un chemin géodésique entre deux autres nœuds. Dans un réseau bipartite, les chemins alternent obligatoirement entre les deux types de nœuds. Par conséquent, cela biaisera les résultats : certains nœuds n’ont aucune chance de se retrouver sur des chemins (selon leur "type"), simplement en raison de la structure bipartite. 
+
+Si l'on veut calculer en toute rigueur les centralités dans un réseau bipartite, il faut ajuster les mesures pour tenir compte de la nature différente des noeuds. Voici différentes méthodes possibles, en prenant pour exemple la centralité de degré : 
+
+### Centralités pondérées
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+deg <- degree(g2, mode = "all")
+deg_norm <- deg / max(deg)
+
+```
+<br>
+**Décryptage**
+
+  * On applique la fonction degree() à l’ensemble du graphe (tous les nœuds, qu’ils soient de type étudiant ou université).
+  * On normalise tous les degrés en fonction du maximum global (souvent issu du groupe dominant ou le plus connecté).
+
+<div class="alert alert-danger" role="alert">
+Attention, cette méthode ne corrige pas totalement les biais dus à la dualité des nœuds dans un réseau bipartite. Elle met sur la même échelle tous les nœuds, mais ne tient pas compte de la structure bipartite. Or, comparer les degrés d’un étudiant et d’une université n’a pas de sens direct car ils n’ont pas les mêmes "opportunités de connexion".
+</div> 
+
+Pour des analyses rigoureuses, il vaut mieux (au choix) : 
+
+  * normaliser par groupe de nœuds (centralités conditionnelles ou z-score); 
+  * travailler sur des projections du réseau, 
+  * utiliser des mesures spécifiques aux graphes bipartites.
+  
+Nous allons aborder ces trois options dans les sections qui suivent. 
+
+### Centralités conditionnelles
+
+Les centralités conditionnelles tiennent compte du nombre inégal de noeuds dans chaque groupe. Voici les étapes à suivre : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Nombre de nœuds dans chaque partition
+
+n_students <- sum(!V(g)$type)
+n_universities <- sum(V(g)$type)
+
+# Calcul du degré
+deg <- degree(g, mode = "all")
+
+# Centralité conditionnelle :
+
+deg_norm <- ifelse(V(g)$type,
+                   deg / n_students,      # Pour les universités : diviser par nb d'étudiants
+                   deg / n_universities)  # Pour les étudiants : diviser par nb d'universités
+
+```
+
+### Z-score 
+
+Le z-score (ou standardisation intra-partition) mesure combien un nœud est central relativement aux autres nœuds du même type. Voici les étapes à suivre : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Séparer les degrés selon les types de noeuds 
+deg_students <- deg[!V(g)$type]
+deg_univ <- deg[V(g)$type]
+
+# Calcul des z-scores
+z_student <- scale(deg_students)
+z_univ <- scale(deg_univ)
+
+# Fusionner dans un vecteur global
+z_all <- rep(NA, length(deg))
+z_all[!V(g)$type] <- z_student
+z_all[V(g)$type] <- z_univ
+
+# Ajouter comme attribut
+V(g)$z_degree <- z_all
+
+```
+<br>
+
+Nous avons pris l'exemple du degré pour illustrer, mais ces calculs d'ajustement peuvent être appliqués à d'autres mesures de centralités (betweeness, eigenvector, etc.).
+
+## Projection
+
+On utilise la fonction **bipartite_projection** fournie dans **igraph** pour créer deux projections à partir du réseau bipartite étudiant-université : 
+
+  * d'une part, un réseau d'étudiants liés par les universités qu'ils ont en commun ;  
+  * d'autre part, un réseau d'universités liées par les étudiants qu'elles partagent. 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+proj <- bipartite_projection(g2)
+
+g_univ <- proj$proj1  # réseau des universités
+g_etud <- proj$proj2  # réseau des étudiants
+
+```
+<br>
+
+Visualisons les projections obtenues : 
+
+```{r warning = FALSE, message = FALSE}
+
+plot(g_etud, vertex.color = "skyblue", 
+     vertex.size = 5, 
+     vertex.label = NA, 
+     layout = layout_with_fr,
+     main = "Réseau d'étudiants \nliés par les universités")
+
+
+plot(g_univ, vertex.color = "tomato", 
+     vertex.shape = "square",
+     vertex.size = 5, 
+     vertex.label = NA, 
+     layout = layout_with_fr,
+     main = "Réseau d'universités\nliées par les étudiants")
+
+
+```
+
+<br>
+
+On peut ensuite appliquer à chaque projection les mesures classiques développées pour les réseaux simples (voir la première partie.)
+
+<div class="alert alert-danger" role="alert">
+**⚠️ Attention**: la projection introduit des biais dus à la densification artificielle du graphe.</div> 
+
+
+
+## Packages spécifiques
+
+### bipartite 
+
+Le package **bipartite** est spécialisé dans les réseaux écologiques mais applicable à d'autres domaines. Il fournit des mesures spécifiques et des visualisations aux réseaux bipartites, ainsi que des projections pondérées.
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+library(bipartite)
+
+# Convertir ton graphe en matrice incidence (étudiants en lignes, universités en colonnes)
+inc_mat <- as_incidence_matrix(g2, types = V(g2)$type)
+
+# Calculer la connectance (densité bipartite)
+networklevel(inc_mat, index = "connectance")
+
+# Visualiser le réseau bipartite en matrice
+plotweb(inc_mat, method = "normal", text.rot = 90)
+
+
+```
+
+### tnet
+
+Le package **tnet** permet une analyse fine des réseaux bipartites pondérés et propose des mesures comme le degré redondant ou la centralité bipartite.
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+library(tnet)
+
+# Conversion de la matrice incidence en format long
+# Format attendu : data.frame avec colonnes : étudiant, université, poids
+edges <- as_data_frame(g2, what = "edges")
+
+# Exemple 1 : calcul du degré redondant
+
+tnet_data <- as.tnet(edges, type = "two-mode")
+bip_deg <- degree_tm(tnet_data)
+head(bip_deg)
+
+```
+<br>
+
+La fonction **degree_tm()** retourne un tableau avec les colonnes suivantes : 
+
+  * node : le nom du nœud (étudiant ou une université).
+  * degree : le nombre de liens du nœud vers des nœuds de l'autre type : pour un étudiant, le nombre d’universités auxquelles il est lié ; pour une université, le nombre d'étudiants qui y sont affiliés. 
+  
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Exemple 2 : calcul de centralité bipartite 
+
+tnet_data2 <- as.tnet(edges, type = "weighted two-mode tnet")
+bip_centrality <- degree_wtm(tnet_data2)
+head(bip_centrality)
+
+```
+<br>
+
+La fonction **degree_wtm()** retourne un tableau avec les colonnes suivantes :
+
+  * degree : nombre de connexions du nœud (non pondéré).
+  * norm.degree : degré normalisé.
+  * strength : somme des poids (1 si non pondéré).
+  * norm.strength : force normalisée.
+  
+
+## A retenir
+
+Les outils classiques d'analyse de réseaux doivent être appliqués de manière critique aux réseaux bipartites : 
+
+  * Les mesures standard peuvent être trompeuses dans un réseau bipartite ;
+  * La projection sur un sous-ensemble (personnes ou événements) permet l’application de métriques classiques, mais au prix d’une simplification et d'une perte d'information (concernant notamment la nature des liens) ;
+  * L’analyse rigoureuse de réseaux bipartites requiert des métriques adaptées ou des algorithmes spécifiques.  
+  * La méthode fondée sur la recherche d'équivalences structurales ou régulières permet de rectifier certains biais des outils classiques. 
+
+# 3. Equivalences structurales/régulières
+
+**L’équivalence structurale** est une notion centrale en analyse de réseau, particulièrement dans la tradition des sociologues américains comme Lorrain et White (1971). Deux nœuds d’un réseau sont dits structurellement équivalents s’ils ont les mêmes liens avec les mêmes autres nœuds. Autrement dit, deux acteurs A et B sont structurellement équivalents s’ils sont connectés aux mêmes alters de la même manière (par exemple, ils reçoivent des liens des mêmes individus et en envoient aux mêmes individus). Il s'agit donc d'une forme très stricte d'équivalence qui repose sur l'identité des positions relationnelles. On parle parfois de positions isomorphes : si on permute deux nœuds structurellement équivalents, la matrice d’adjacence du graphe reste inchangée.
+
+**L’équivalence régulière** est une généralisation plus souple de l’équivalence structurale, introduite en analyse de réseau dans les années 1970-80 par des chercheurs comme Lorrain, White, Everett et Borgatti. Deux nœuds sont régulièrement équivalents s’ils ont des relations similaires avec des types similaires d’autres nœuds, même si ces nœuds ne sont pas les mêmes individus. En d'autres termes, deux acteurs sont régulièrement équivalents s’ils occupent des rôles similaires dans la structure du réseau. 
+
+La recherche d'équivalences structurales ou régulières est une méthode intéressante pour **modéliser des classes d'acteurs** et **analyser des rôles sociaux** des réseaux complexes. 
+
+Elle fournit aussi une solution élégante et robuste aux problèmes méthodologiques que pose l'analyse des réseaux bipartites :
+
+  1. **Réduction de la complexité via le bloc-modélisation**. En regroupant les nœuds structurellement équivalents en positions (ou "blocs"), on peut réduire la taille du réseau et modéliser les relations entre types de rôles ou de fonctions plutôt qu’entre individus. Cela est particulièrement utile pour les grands réseaux bipartites.
+  2. **Préservation de la structure bipartite**. Contrairement à la projection, l’analyse par équivalence structurale conserve la structure originale : on modélise directement les interactions entre les deux types de nœuds, sans avoir besoin de les aplatir en réseau unipartite.
+  3. **Accès à des structures latentes**. Elle permet d’identifier des positions sociales ou fonctionnelles dans le réseau — comme des groupes de personnes jouant des rôles similaires au sein d’organisations — qui ne seraient pas repérables par des mesures classiques.
+  
+Pour approfondir sur ce sujet, voir notamment les articles de Pizarro (2007) et Lucena de Piquero (2019, 2024) (cf. références)
+
+Dans ce tutoriel, nous allons montrer comment utiliser le package [Places](https://lereps.sciencespo-toulouse.fr/new-r-package-places-structural-equivalence-analysis-for-two-mode-networks) pour identifier et visualiser des equivalences structurales et régulières dans notre réseau bipartites d'étudiants et d'universités. 
+
+L'objectif est de détecter les étudiants structurellement équivalents, c'est-à-dire les étudiants qui ont étudié dans les mêmes universités. 
+
+L'analyse d'équivalences avec **Places** suit plusieurs étapes : 
+
+## Installer et charger le package Places
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+install.packages("http://lereps.sciencespo-toulouse.fr/IMG/gz/places_0.2.3.tar.gz", repos = NULL, type = "source")
+library(Places)
+```
+
+## Identifer les places
+
+**Important à retenir** : La *edge list* d'origine (ici, *auc_edge*) doit impérativement et exclusivement être au format dataframe. Pour vérifier, exécuter la fonction **class()** et appliquer la fonction **as.data.frame()** pour effectuer la conversion si nécecessaire. 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+class(auc_edge)
+auc_edge <- as.data.frame(auc_edge)
+class(auc_edge)
+```
+<br>
+On peut à présent appliquer la fonction **place()** à notre liste de liens. Cette function se compose de trois arguments : 
+
+  * **data**: la liste de liens de départ (*auc_edge*), au format dataframe.  
+  * **col.elements**: la colone source pour les éléments (Elements) pour lesquels on veut rechercher les équivalences (ici, les étudiants). 
+  * **col.sets**: la colonne des ensembles (Sets) auxquels les étudiants appartiennent (ici, les universités), et qui servent à définir les équivalences. 
+  
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+places <- places(data = auc_edge, col.elements = "Student", col.sets = "University")
+
+# ou sous une forme abrégée : 
+
+places <- places(auc_edge, "Student", "University") # même résultat
+
+```
+<br>
+La console indique que 223 places ont été identifiées à partir des 418 étudiants (elements) et des 147 universités (sets) présents dans la liste de départ. 
+
+La fonction **`place()`** retourne un objet de type liste qui contient trois dataframes :
+
+  1. **data** : la *edge list* d'origine avec une colonne supplémentaires **"Places"** contenant les places identifiées.
+  2. **PlacesData** : un dataframe contenant les informations sur les places. 
+3. **EdgeList** : le réseau des places, présenté sous la forme d’une **edge list** liant les places aux universités.
+
+Intéressons-nous d'abord au dataframe **PlacesData** qui contient les informations suivantes : 
+
+* **PlaceNumber** : indique le numéro des places, classées par ordre décroissant de taille en fonction du nombre de sets (ici d'universités) qu'elles contiennent.
+* **PlaceLabel** : l'identifiant complet de la place : son numéro suivi entre parenthèses du nombre d’éléments et de sets qu'elle contient.  
+* **NbElements** : le nombre d’éléments (étudiants) contenus dans la place.
+* **NbSets** : le nombre d’ensembles (universités) dans la place.
+* **PlaceDetail** : cette colonne contient les informations détaillées sur les places, en particulier les noms de tous les éléments (étudiants) et ensembles (universités) qui les définissent.
+
+Extrayons les places sous formes de dataframe pour pouvoir les manipuler plus facilement : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+places_df <- as.data.frame(places$PlacesData) 
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+g1_centrality %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+
+## Analyser les places
+
+Examinons la distribution des étudiants dans les places :  
+
+```{r warning = FALSE, message = FALSE}
+
+table(places_df$NbElements)
+
+library(ggplot2)
+
+ggplot(places_df, aes(x = NbElements)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Students by place",
+       x = "Number of Students",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+<br>
+Examinons la distribution des universités dans les places :  
+
+```{r warning = FALSE, message = FALSE}
+
+table(places_df$NbSets)
+
+ggplot(places_df, aes(x = NbSets)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Universities by place",
+       x = "Number of Universities",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+<br>
+Extrayons les places plus significatives : 
+
+```{r warning = FALSE, message = FALSE}
+
+kable(places_df %>% filter(NbElements >1 & NbSets>1)) %>% 
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+<br>
+Extraire les informations à l'intérieur des places (utile si l'on a besoin d'associer les étudiants ou les universités à la place qui leur correspond) : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+places_data <- as.data.frame(places$data) 
+
+```
+
+
+```{r warning = FALSE, message = FALSE}
+
+  places_data %>% 
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+## Projections 
+
+Nous allons maintenant extraire les deux réseaux complémentaires issus de la recherche d'équivalence dans notre réseau bipartite de départ :
+
+  * Le réseau de places (étudiants structurellement équivalents) liées par les universités : 
+  * Le réseau d'universités liés par les places. 
+  
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+Net <- graph_from_data_frame(places$Edgelist, directed = FALSE)
+
+## transformation en réseau bipartite 
+
+V(Net)$type <- bipartite_mapping(Net)$type
+
+# Projection
+
+projNet <- bipartite_projection(Net, multiplicity = TRUE)
+Net1 <- projNet$proj1  # Réseau d'éléments/places (étudiants structurellement équivalents)
+Net2 <- projNet$proj2  # Réseau de sets (universités)
+
+```
+
+<div class="alert alert-danger" role="alert"> 
+**A retenir** 
+
+  1. Le réseau bipartite construit à partir des places est une réduction de notre réseau bipartite de départ. Les noeuds ne correspondent plus à un étudiant isolé, mais à un groupe d'étudiants structurellement équivalents.
+  2. Certaines places ne contiennent qu'un seul étudiant, ce qui signifie que cet étudiant occupe une position unique dans le réseau. Il est lié à une combinaison unique d'universités, et aucun autre étudiant ne présente la même combinaison.
+  3. Par rapport aux projections classiques construites directement à partir du réseau bipartite de départ, la projection à partir des places présente l'avantage d'éliminer les redondances et de conserver la quintessence du réseau, sans perdre d'informations. 
+  
+</div>
+
+<br>
+Projetons le graphe des places liés par les universités : 
+
+```{r warning = FALSE, message = FALSE}
+
+plot(Net1, vertex.size = 5, 
+     vertex.color = "purple", 
+     vertex.label = NA, 
+     main="Network of places\nlinked by universities")
+
+
+# Ajuster la taille des noeuds en fonction du nombre d'étudiants dans chaque place : 
+
+V(Net1)$size <- places_df$NbElements
+
+plot(Net1, vertex.size = V(Net1)$size, 
+     vertex.color = "purple", 
+     vertex.label = NA, 
+     layout = layout_components,
+     main="Network of places\nlinked by universities",
+     sub = "Node size represents place size \n (number of elements/students)")
+
+```
+
+<br>
+Projetons maintenant le graphe des universités liées par les places : 
+```{r warning = FALSE, message = FALSE}
+
+plot(Net2, vertex.size = 7, 
+     vertex.color = "orange", 
+     vertex.label = NA, 
+     vertex.shape = "square",
+     main="Network of universities\nlinked by places")
+
+```
+
+## Poids des liens 
+
+Comme les deux réseaux sont valués, il est intéressant d'analyser le poids des liens : 
+```{r warning = FALSE, message = FALSE}
+
+table(E(Net1)$weight)
+table(E(Net2)$weight)
+
+```
+<br>
+Examinons de plus près les paires de places et d'universités qui ont les liens les plus forts, qui représentent les parcours d'étudiants les plus fréquents ou typiques
+```{r warning = FALSE, message = FALSE}
+
+E(Net1)[weight > 1]
+E(Net2)[weight == 2]
+E(Net2)[weight == 4]
+
+```
+
+
+## Mesures et communuautés
+
+On peut appliquer en toute sécurité les mesures classiques conçues pour les réseaux simples (voir section 1).
+
+De même, on peut appliquer la détection de communautés sans risque de créer des clusters artificiels, puisque les liens redondants ont été fusionnés grâce aux places (voir section 1). 
+
+<div class="alert alert-success" role="alert"> 
+**Note** 
+Comme les réseaux ne sont pas connexes (ils contiennent plusieurs composantes non connectées), il est préférable d'extraire la composante principale pour le calcul les mesures d'intermédiarité et de proximité, ainsi que pour la détection de communuautés. Pour extraire la composante principale, on peut appliquer le code suivant :  
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+# Identifier les composantes connectées
+compo1 <- components(Net1)
+compo2 <- components(Net2)
+
+# Extraire les sommets de la plus grande composante
+giant_compo1 <- which(compo1$membership == which.max(compo1$csize))
+giant_compo2 <- which(compo2$membership == which.max(compo2$csize))
+
+# Extraire la composante principale comme un sous-graphe
+main_compo1 <- induced_subgraph(Net1, giant_compo1)
+main_compo2 <- induced_subgraph(Net1, giant_compo2)
+
+```
+</div>
+
+## Equivalences régulières (*k-place*)
+
+La fonction **kplace()** permet d'extraire les équivalences régulières. Sa structure est similaire à la fonction de place(), mais elle contient en plus un argument spécifique pour spécifier le nombre de différences tolérées dans la recherche d'équivalence. Par exemple, si k = 1, on tolère que les étudiants diffèrent par une université, si k = 2, qu'ils aient deux universités différentes, etc : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+kplaces <- kplaces(data = auc_edge, col.elements = "Student", col.sets = "University", k = 1)
+kplaces <- kplaces(auc_edge, "Student", "University", 1) # version abrégée 
+
+```
+<br>
+
+219 places et 2 k-places (ou « cas ambigus ») ont été identifiées à partir des 418 étudiants et 146 universités. 
+
+La fonction **k-places()** retourne une liste composée de quatre dataframes :
+
+  * Le dataframe d'origine avec en plus une colonne « Places » contenant les places détectées. 
+  * Un dataframe contenant des informations sur les places et les k-places.
+  * Un dataframe présentant les relations entre les places fusionnées avec les k-places et les ensembles communs.
+  * Le réseau des places sous la forme d’une liste d’arêtes en deux modes.
+
+Le dataframe, contenant des informations sur les places et les k-places renseigne les caractéristiques suivantes :
+
+  * PlaceLabel contient les étiquettes des places et des k-places. Les étiquettes des places commencent par « P », suivie du numéro de place, du nombre d’éléments dans la place et du nombre d’ensembles définissant la place. Les étiquettes des k-places commencent aussi par « P », suivies du numéro de k-place, d’un *, du nombre d’éléments dans la k-place, du nombre d’ensembles communs et de la valeur de k.
+  * NbElements contient le nombre d’éléments dans la place ou la k-place.
+  * NbSets contient le nombre d’ensembles définissant la place ou la k-place.
+  * PlaceDetail contient le nom de tous les éléments présents dans la place ou la k-place, ainsi que tous les ensembles définissant cette place ou k-place.
+
+
+Extrayons les places et kplaces détectées : 
+
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+
+places2_df <- as.data.frame(kplaces$KPlacesData) # toutes les équivalences
+kplaces_df <- as.data.frame(kplaces$kPlaces) # équivalences régulières uniquement 
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+  places2_df %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+  kplaces_df %>%
+  head(5) %>%
+  kable() %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+
+## Quizz
+
+  1. Observez la distribution des étudiants et des universités dans les places. Comment peut-on l'interpréter ? 
+  2. Quelle place contient le plus grand nombre d'étudiants ? Quelle place contient le plus grand nombre d'universités ? Quelle est la place qui contient à la fois le plus grand nombre d'étudiants et d'universités ? 
+  3. Identifier les liens forts dans les deux réseaux complémentaires de places et d'universités. A quoi correspondent-ils ? Comment les interpréter ? 
+
+<div class="alert alert-danger" role="alert">
+**Important à retenir** 
+
+  * La notion de **places** peut prêter à confusion. Elle ne doit pas être entendue au sens géographique, mais comme un synonyme de la notion d'équivalence, i.e. au sens de position dans un réseau. 
+  * De même, Le package *Places* (avec une majuscule) dédié à la recherche d'équivalence dans un réseau - ne doit pas être confondu avec le package **places** (minuscule) (un ancien package dédié à l'analyse géographique). 
+</div>
+
+<div class="alert alert-success" role="alert"> 
+**Note** : 
+D'autres outils existent pour la recherche d'équivalences notamment le package **blockmodeling** ou les fonctions **equiv.clust()* et **blockmodel()** du package **sna**. Le package **Places** offre une solution robuste particulièrement adaptée à l'analyse des réseaux bipartites et relativement bien documentée (voir notamment la fiche [RZine](https://rzine.fr/bibliography/article_8/) dédiée). 
+</div>
+
+# Bonus : R vers Cytoscape et Gephi
+
+**igraph** est un très bon package pour l'analyse et la manipulation des données (conversion entre formats, calculs de centralités, détection de communautés), mais il est moins efficace pour la visualisation. Il est souvent utile d'utiliser en complément un logiciel de visualisation de réseau comme [Gephi](https://gephi.org/) ou [Cytoscape](https://cytoscape.org/) qui permettent d'explorer et d'interagir avec le réseau. 
+
+Deux options s'offrent à vous :
+
+  * construire vos réseaux directement dans les logiciels spécialisés et les explorer en parallèle de R ; 
+  * faire communiquer directement R avec les logiciels en utilisant les packages spécifiques [RCy3](https://cytoscape.org/RCy3/articles/Overview-of-RCy3.html) ou [Cyrface](https://saezlab.github.io/cyrface/) et [GephiForR](https://cran.r-project.org/web/packages/GephiForR/refman/GephiForR.html). 
+
+# Remarques finales
+
+L'une des principales difficultés de l'analyse de réseau est de parvenir à transposer ses concepts à nos données particulières et de savoir interpréter les résultats dans le contexte de notre recherche. Certaines mesures et certains outils de l'analyse de réseaux sont plus ou moins pertinents selon les cas. Il est important de se demander, par exemple, à quoi correspond un fort degré de centralité ou d'intermédiarité dans le cas précis étudié (e.g., d'un mot dans un réseau sémantique) ? De même, à quoi correspond une communauté de mots ? Quelles interprétations peut-on en tirer ? 
+
+# Références 
+
+Voici une sélection de références essentielles pour l'analyse de réseaux avec R, adaptées aux doctorants en SHS :
+
+## Ouvrages de référence généraux
+
+  1. Borgatti, Everett, Johnson & Agneessens. *Analyzing Social Networks* (3e éd., 2024). Sage Publications. Manuel clair et structuré (mesures, collecte, éthique, études de cas)
+  2. Scott, J. (2017). *Social Network Analysis* (4e édition). Sage Publications. Introduction accessible aux concepts clés, particulièrement adaptée aux sciences sociales, avec une approche progressive.
+  2. Wasserman, S., & Faust, K. (1994). *Social Network Analysis: Methods and Applications*. Cambridge University Press. Le manuel de référence incontournable, couvrant exhaustivement les fondements théoriques et méthodologiques de l'analyse de réseaux sociaux.
+
+## Manuels spécifiques à R
+
+  4. Luke, D. A. (2015). *A User's Guide to Network Analysis in R*. Springer. Guide pratique et accessible, spécifiquement conçu pour les utilisateurs de R en sciences sociales, avec de nombreux exemples concrets.
+  5. Ognyanova, K. (2021). *Network Analysis and Visualization with R and igraph*. Tutoriel en ligne exhaustif et régulièrement mis à jour, disponible gratuitement : https://kateto.net/netscix2016.html
+  6. Kolaczyk, E. D., & Csárdi, G. (2014). *Statistical Analysis of Network Data with R*. Springer. Approche plus statistique et avancée, excellent pour les aspects méthodologiques rigoureux.
+
+## Ressources pratiques et tutoriels
+
+  7. Beauguitte, L. (2016). "Analyser les réseaux sociaux avec R". *Groupe FMR*. Ressource en français spécifiquement dédiée à R, avec une approche pédagogique adaptée aux SHS.
+  8. Briatte, F. (2016). "Network Analysis and Political Science". *PS: Political Science & Politics*, 49(2), 245-250.
+Article méthodologique centré sur les applications en science politique, avec code R disponible.
+  9. Grandjean, M. (2015). *Introduction à la visualisation de données : l'analyse de réseau en histoire*. Geschichte und Informatik, 18/19, 109-128. Approche historique de l'analyse de réseaux avec des exemples pratiques en R.
+
+
+Ces références couvrent le spectre complet depuis les fondements théoriques jusqu'à l'implémentation pratique en R, avec plusieurs ressources en français pour faciliter l'appropriation des concepts. Je recommande de commencer par Scott (2017) pour les concepts, puis Luke (2015) pour la pratique avec R, en complément du tutoriel d'Ognyanova pour la visualisation.
+
