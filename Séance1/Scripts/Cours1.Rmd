@@ -237,9 +237,10 @@ On y voit plus clair !
 
 ## Créer de nouvelles variables : mutate()
 
-La fonction mutate() est couramment employée pour créer de nouveleles variables (colonnes).  
+La fonction **mutate()** est couramment employée pour créer de nouvelles  colonnes.  
 
-Par exemple, on veut étudier la durée de formation des étudiants. Pour cela, nous allons calculer la différence entre la fin et le début de la formation et stocker cette information dans une nouvelle variable (Duration). Pour créer cette nouvelle variable, on utilise la **mutate()** et l'on indique ce que l'on veut mettre dedans après le "=" (soustraire l'année de début à l'année de fin) : 
+Par exemple, on veut étudier la durée de formation des étudiants. Pour cela, nous allons calculer la différence entre la fin et le début de la formation et stocker cette information dans une nouvelle variable (Duration). 
+Pour créer cette nouvelle variable, on utilise la fonction **mutate()** et l'on indique ce que l'on veut mettre dedans après le "=" (soustraire l'année de début à l'année de fin) : 
 
 ```{r message = FALSE, warning = FALSE}
 
@@ -278,7 +279,7 @@ auc_simple <- auc_simple %>% mutate(Name2 = Name) %>% relocate(Name2, .after = N
 auc_simple
 
 ```
-<br>
+
 ### Option 1 avec base R
 
 ```{r message = FALSE, warning = FALSE}
@@ -336,7 +337,7 @@ auc_simple %>% distinct(Name, University, Field) # triplets unique
 ```
 
 <div class="alert alert-success" role="alert"> 
-**Note**: La fonction **distinct()**  peut être combinée avec d'autres fonctions de `dplyr`, par exemple **count()**, pour faire des comptages, comme on le verra dans la section suivante (3). Elle est utile également pour préparer une liste de liens (*edge list*) en vue d’une analyses de réseau, comme on le verra dans une prochaine séance. Plus généralement, la fonction **distinct()** est très utile pour  nettoyage ou simplifier ses données. </div>
+**Note**: La fonction **distinct()**  peut être combinée avec d'autres fonctions de `dplyr`, par exemple **count()**, pour faire des comptages, comme on le verra dans la section suivante (3). Elle est utile également pour préparer une liste de liens (*edge list*) en vue d'une analyse de réseau, comme on le verra dans la 3e séance. Plus généralement, la fonction **distinct()** est très utile pour nettoyer ou simplifier ses données. </div>
 
 
 ## Filtrer des valeurs : filter()
@@ -384,7 +385,7 @@ auc_simple %>% filter(!is.na(Field))
 ```
 </div> 
 
-On peut aussi filtrer des **variables numériques¨¨. Par exemple, sélectionnons les étudiants dont la formation a duré plus de 2 ans : 
+On peut aussi filtrer des **variables numériques**. Par exemple, sélectionnons les étudiants dont la formation a duré plus de 2 ans : 
 ```{r message = FALSE, warning = FALSE}
 
 auc_simple %>% filter(Duration > 2) # 3 ans et plus 
@@ -962,7 +963,7 @@ auc_field_sector <- auc_simple %>%
 
 Le résultat (auc_field_sector) est donc un tableau de contingence où les secteurs sont en lignes, les champs en colonnes, et les cellules indiquent le nombre d’individus pour chaque couple (Sector, Field).
 
-Ensuite, on charge le package FactoMinR - l'un des principaux packages pour les analyses multidimensionnelles et l'on applique la fonction **CA()** à notre table de contingence pour réaliser l'analyse de correspondence :  
+Ensuite, on charge le package [FactoMinR](http://factominer.free.fr/), l'un des principaux packages pour les analyses multidimensionnelles, et l'on applique la fonction **CA()** à notre table de contingence pour réaliser l'analyse de correspondence :  
 
 ```{r message = FALSE, warning = FALSE}
 
