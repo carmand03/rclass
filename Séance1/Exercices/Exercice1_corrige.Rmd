@@ -7,9 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(FactoMineR)
-library(forcats)
 library(tidyverse)
+library(forcats)
+library(FactoMineR)
 ```
 
 # QCM 
@@ -188,7 +188,7 @@ youmei_clean <- youmei %>% select(DocId, FullName_py, gender,
   9. Calculer la durée moyenne des études. 
   10. Calculer l'âge au départ et au retour (créer un nouvelle variable à chaque fois).
 
-```{r warning = FALSE, message = FALSE, echo = FALSE, eval = FALSE}
+```{r warning = FALSE, message = FALSE}
 
 # 1. Combien y a-t-il désormais d'individus avec des données complètes ? 
 
@@ -450,11 +450,11 @@ youmei_field_funding <- youmei_clean %>%
               values_from = n, values_fill = 0)
 
 
-# on convertit la colonne des provinces en noms de lignes
+# on convertit la colonne des disciplines en noms de lignes
 
 library(tidyverse)
 
-youmei_field_funding_ca <- column_to_rownames(youmei_province_funding, var = "financement") 
+youmei_field_funding_ca <- column_to_rownames(youmei_field_funding, var = "financement") 
 
 # on applique l'analyse des correspondances
 
