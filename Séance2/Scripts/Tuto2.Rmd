@@ -81,9 +81,8 @@ lyon_corpus %>%
 
 ## Quizz 
 
-<div class="alert alert-primary" role="alert"> 
   1. Combien d'articles contient le corpus?  
-  2. Quelles sont les métadonnées disponibles ?  </div>
+  2. Quelles sont les métadonnées disponibles ?
 
 # Explorer les métadonnées
 
@@ -102,8 +101,9 @@ lyon_corpus %>%
 <div class="alert alert-primary" role="alert"> 
 **Questions:**
 
-  1. Comment se répartissent les articles entre les différents journaux ? Dans quels journaux notre objet d'étude (Lyon) est-il le plus évoqué ?  
-  2. Sélectionner les titres de presse qui comportent plus de 10 articles.</div>
+  1. Comment se répartissent les articles entre les différents journaux ? 
+  2. Dans quels journaux notre objet d'étude (Lyon) est-il le plus évoqué ?  
+  3. Sélectionner les titres de presse qui comportent plus de 10 articles.</div>
   
 ```{r warning = FALSE, message = FALSE, eval = FALSE, echo = FALSE}
 
@@ -133,7 +133,7 @@ lyon_corpus %>%
 ```
 
 <br> 
-**Note:** les catégories fournies dans la source d'origine présentent une grande diversité et un certain manque de cohérence. Afin de faciliter l’analyse, il est utile de rationaliser travail de regroupement a été effectué pour homogénéiser les catégories d'origine. Les choix opérés pour ces regroupements sont explicités ci-dessous, accompagnés du code utilisé pour les mettre en œuvre. 
+**Note:** les catégories fournies dans la source d'origine présentent une grande diversité et un certain manque de cohérence. Afin de faciliter l’analyse, un travail de regroupement a été effectué pour homogénéiser les catégories d'origine. Les choix opérés pour ces regroupements sont explicités ci-dessous, accompagnés du code utilisé pour les mettre en œuvre. 
 
 <div class="alert alert-success" role="alert"> 
 
@@ -198,6 +198,7 @@ lyon_corpus %>%
   </tr>
 </tbody></table>
 
+<br>
 **Code pour nettoyer et normaliser les catégories d'articles**: 
 ```{r warning = FALSE, message = FALSE, eval = FALSE}
 
@@ -223,7 +224,6 @@ lyon_corpus <- lyon_corpus %>%
   ))
 
 ```
-</div>
 
 <br>
 
@@ -243,7 +243,7 @@ lyon_corpus <- lyon_corpus %>%
   * **fixed()** (stringr) : indique que le motif est du texte littéral (par opposition à *regex* (expression régulière) qui tolère des variations dans le motif).
   * **case_when()** (dplyr) : crée une valeur selon la première condition vraie ((if/elseif…) (c'est une généralisation de la formule "if else"). **case_when()** évalue les conditions dans l’ordre et retourne la première correspondance (c'est important si plusieurs motifs peuvent correspondre).
   * **str_detect()** (stringr) : teste si une chaîne contient un motif. Cette fonction utilise une expression régulière : "A|B|C" veut dire "A ou B ou C". Ici, on teste la présence de mots-clés pour leur affecter un groupe. Par exemple : si *category_clean* contient "Feature" ou "Article" → "Feature/Article". Si elle contient "Editorial" ou "Commentary" ou "Letter to the Editor" → "Opinion/Editorial". Sinon, on tombe dans la catégorie par défaut "Other".
-
+</div>
 
 <br>
 Après ce travail de rationalisation, on obtient la répartition suivante, plus frappante et facile à analyser : 
@@ -275,7 +275,7 @@ Pour cela, il faut d'abord extraire l'année de publication à partir du champ "
 library(stringr)
 
 lyon_corpus <- lyon_corpus %>% 
-  mutate(Year = stringr::str_sub(Date,0,4)) %>% 
+  mutate(Year = str_sub(Date,0,4)) %>% 
   mutate(Year = as.numeric(Year)) 
 
 ```
@@ -443,7 +443,8 @@ Le sous-corpus qui en résulte contient 1,418 articles s'étalant sur la périod
 <div class="alert alert-success" role="alert"> 
 **Bon à savoir** 
 
-Si l'on veut constituer un échantillon aléatoire, on peut appliquer la fonction **slice_sample()** du package dplyr et choisir le nombre (n =) ou la proportion du corpus (prop = ) que l'on veut conserver. On applique set.seed() avant pour garantir la reproductibilité : 
+Si l'on veut constituer un échantillon aléatoire, on peut appliquer la fonction **slice_sample()** du package dplyr et choisir le nombre (n =) ou la proportion du corpus (prop = ) que l'on veut conserver. La fonction **set.seed()** sert à stabiliser le résultat pour le reproduire éventuellement : 
+
 ```{r warning = FALSE, message = FALSE, eval=FALSE}
 
 library(dplyr)
@@ -540,6 +541,7 @@ lyon_token_count <- lyon_token_count %>%
 **Explications**
 
 On élimine les "non-mots" résiduels dans notre corpus tokenisé pour ne conserver que les mots les plus significatifs : 
+
   * **filter(nchar(word) > 3)** : on ne garde que les mots de plus de 3 lettres. L'objectif : éliminer les mots trop courts (souvent des erreurs d'OCR).
   * **filter(!str_detect(word, '[0-9]{1,}'))**  : on élimine les mots qui contiennent des chiffres : str_detect() (package stringr) cherche une correspondance regex. Ici : '[0-9]{1,}' = au moins un chiffre dans le mot. Le ! = négation → on exclut tous les mots qui contiennent des chiffres. Exemple : "street19", "1932" seront supprimés.
   * **filter(!word %in% c("tion", "tions", "ment"))** : on supprime explicitement les mots "tion", "tions" et "ment" (souvent des mots coupés en bout de colonnes). %in% teste l’appartenance à une liste.  
@@ -581,7 +583,7 @@ lyon_token_source_tfidf <- lyon_token_filtered %>%
 ```
 <br>
 Comparons les fréquences à travers les différents journaux pour faire émerger les termes  spécifiques à chaque journal : 
-```{r message = FALSE, warning = FALSE, eval = FALSE}
+```{r message = FALSE, warning = FALSE}
 
 lyon_token_source_tfidf %>% 
   group_by(Source) %>%
@@ -601,7 +603,8 @@ lyon_token_source_tfidf %>%
 
 ## Bigrams
 
-Jusqu'ici, on s'en est tenu au niveau individuel du mot, ce qui présente des limites, car on l'isole de son contexte. Nous allons maintenant voir comment constuire des bigrams (la même approche peut être appliquée pour des trigrammes ou plus). La fonction est la même que pour la tokenisation simple, il suffit de changer le nombre *n* de tokens désiré (2 pour des bigrams, 3 pour des trigrams, etc) : 
+Jusqu'ici, on s'en est tenu au niveau individuel du mot, ce qui présente des limites, car on l'isole de son contexte. Nous allons maintenant voir comment construire des bigrams (la même approche peut être appliquée pour des trigrammes ou plus). 
+La fonction est la même que pour la tokenisation simple, il suffit de changer le nombre *n* de tokens désiré (2 pour des bigrams, 3 pour des trigrams, etc) : 
 
 ```{r message = FALSE, warning = FALSE, eval = FALSE}
 
@@ -615,11 +618,11 @@ lyon_bigram_filtered %>% group_by(bigram) %>% count(sort = TRUE)
 
 ```
 <br>
-Comme pour les *unigrammes*, on s'aperçoit en inspectant les résultats qu'un nettoyage est nécessaire afin de ne conserver que les bigrams les plus significatifs. L'opération s'effectue en trois étapes : 
+Comme pour les *unigrammes*, on s'aperçoit en inspectant les résultats qu'un nettoyage est nécessaire afin de ne conserver que les bigrammes les plus significatifs. L'opération s'effectue en trois étapes : 
 
   1. On éclate d'abord les bigrammes pour traiter séparer chaque terme qui les constitue. 
   2. On utilise la liste de termes que nous avons établie précédemment pour éliminer les termes non pertinents. 
-  3. On reconstitue les bigrammes à partir des termes. 
+  3. On reconstitue les bigrammes. 
   
 ```{r message = FALSE, warning = FALSE, eval = FALSE}
 
@@ -679,16 +682,25 @@ lyon_bigram_source_tfidf %>%
        caption = "Based on ProQuest \"Chinese Newspapers Collection\"")
 
 ```
-<br>
+
 ## Du n-gram au contexte 
 
 Bien que plus informative que l’analyse unigramme au niveau du mot, l’analyse des mots adjacents reste limitée : elle ne fournit qu’une vision étroite du contexte linguistique. Pour élargir cette perspective, d’autres approches peuvent être mobilisées, notamment l’analyse par **concordance**, qui permet d’observer un mot choisi dans son environnement syntaxique immédiat, selon une fenêtre contextuelle définie par le chercheur (c'est pourquoi on appelle aussi cette méthode **KWIC**, i.e. keyword in context). Cette méthode relève principalement d’une démarche qualitative fondée sur une lecture attentive (*close reading*), ce qui la rend précieuse pour l’interprétation fine des usages, mais difficilement généralisable et peu adaptée à une analyse à grande échelle. L'approche par concordance peut donc être avantageusement complétée par des méthodes quantitatives fondées sur l’analyse de **co-occurrences** dans un contexte élargi — phrase, paragraphe, ou document entier — dont l’étendue est paramétrable selon le niveau de granularité recherché. Ces approches permettent de détecter des régularités d’association lexicales plus globales, souvent invisibles à l’échelle micro, et offrent des perspectives complémentaires entre contextualisation fine et modélisation des tendances d’usage.
 
 # Concordance 
 
-On choisit d'examiner le terme clé "lyon". On propose deux approches avec deux packages différents : (1) la première avec le package *histtext* (2) la deuxième avec **quanteda**.
+On choisit d'examiner le terme clé "lyon". On propose deux approches fondées sur deux packages différents : (1) [histtext](https://bookdown.enpchina.eu/rpackage/HistTextRManual.html) (2) [quanteda](https://quanteda.io/).
 
 ## Avec HistText
+
+1. Chargez le package **histtext** (l'installer au préalable en suivant les instructions données dans le fichier "install_histtext.R") : 
+```{r message = FALSE, warning = FALSE, eval=FALSE}
+
+library(histtext)
+
+```
+<br>
+2. Appliquez la fonction **search_concordance_on_df()**: 
 ```{r message = FALSE, warning = FALSE, eval=FALSE}
 
 lyon_conc1 <- search_concordance_on_df(lyon_corpus_filtered, 
@@ -708,18 +720,23 @@ lyon_conc1
 
 ```
 
-
 ## Avec Quanteda
 
-L'inconvénient du package quanteda est qu'il requiert de transformer au préalable notre dataframe en objet "corpus" pour le rendre traitable par ses différentes fonctions : 
+Le package **quanteda** requiert de transformer au préalable notre dataframe en objet "corpus" pour le rendre traitable par ses différentes fonctions : 
+
 ```{r message = FALSE, warning = FALSE, eval=FALSE}
 
-lyon_quanteda <- corpus(lyon_corpus_filtered, text_field = "Text", docid_field = "DocId")
+# on transforme le dataframe en objet "corpus" traitable par quanteda 
+
+lyon_quanteda <- corpus(lyon_corpus_filtered, text_field = "Text", docid_field = "DocId") 
+
+# on tokenise le corpus avec la fonction tokens() de quanteda
 
 lyon_quanteda_tokens <- tokens(lyon_quanteda)
 
-lyon_conc2 <- kwic(lyon_quanteda_tokens, pattern = "lyon", window = 30)
+# on applique la fonction kwic() pour voir le terme choisi dans son contexte
 
+lyon_conc2 <- kwic(lyon_quanteda_tokens, pattern = "lyon", window = 30)
 
 ```
 
@@ -730,12 +747,10 @@ lyon_conc2
 ```
 <br>
 
-<div class="alert alert-danger" role="alert">
 **Questions:** 
   
   * Les résultats sont-ils les mêmes ? Comment l'expliquer ?
-  * Quelle méthode vous semble préférable ? (Justifier en fonction de vos besoins)
-</div> 
+  * Quelle méthode vous semble préférable ? Justifier (La réponse peut varier en fonction de vos besoins).
 
 # Co-occurrences
 
@@ -1003,13 +1018,13 @@ out <- stm::prepDocuments(corpus$documents,
 ```
 <br>
 <div class="alert alert-success" role="alert"> 
-A l'issue de cette fonction, un message nous renseigne sur les termes du corpus pour cause de fréquence. Attention à bien comprendre : cela ne signifie pas que les termes ont été physiquement supprimés de notre jeu de données d'origine. Cela signifie simplement qu'ils ne seront pas pris en compte dans la modélisation de thème (le terme "corpus" ici est à prendre au sens technique de l'objet corpus requis par le package stm). Le message informe également sur les documents éventuellement éliminés lors du prétraitement pour cause de fréquence. Ici, aucun document n'a été éliminé. Sur la différence entre term et token, voir l'aide-mémoire.</div> 
+A l'issue de cette fonction, un message nous renseigne sur les termes du corpus pour cause de fréquence. Attention à bien comprendre : cela ne signifie pas que les termes ont été physiquement supprimés de notre jeu de données d'origine. Cela signifie simplement qu'ils ne seront pas pris en compte dans la modélisation de thème (le terme "corpus" ici est à prendre au sens technique de l'objet corpus requis par le package stm). Le message informe également sur les documents éventuellement éliminés lors du prétraitement pour cause de fréquence. Ici, aucun document n'a été éliminé. Sur la différence entre *term* et *token*, voir l'aide-mémoire (fichier "Memo2").</div> 
 
 ## 3. Construction du modèle 
 
-La sélection du nombre de topics *k* reste une question ouverte. Le package *stm* fournit différents outils statistiques pour vous aider à déterminer le nombre optimal de topics en fonction de la taille et la structure de votre corpus, mais *in fine*, le modèle idéal est celui qui vous fournit des résultats interprétables et utile à votre analyse. ^[Selon les créateurs du package [stm package](https://cran.r-project.org/web/packages/stm/stm.pdf), pour les corpus de taille moyenne voire petite en SHS, allant de quelques centaines à quelques milliers de documents, the nombre optimal de topics oscille entre 5 and 50. Voir Margaret Roberts et al., “Stm: Estimation of the Structural Topic Model,” September 18, 2020, 64–65, https://CRAN.R-project.org/package=stm].
+La sélection du nombre de topics *k* reste une question ouverte. Le package **stm** fournit différents outils statistiques pour vous aider à déterminer le nombre optimal de topics en fonction de la taille et la structure de votre corpus, mais *in fine*, le modèle idéal est celui qui vous fournit des résultats interprétables et utile à votre analyse. ^[Selon les créateurs du package [stm package](https://cran.r-project.org/web/packages/stm/stm.pdf), pour les corpus de taille moyenne voire petite en SHS, allant de quelques centaines à quelques milliers de documents, the nombre optimal de topics oscille entre 5 and 50. Voir Margaret Roberts et al., “Stm: Estimation of the Structural Topic Model,” September 18, 2020, 64–65, https://CRAN.R-project.org/package=stm].
 
-La fonction *searchK()* fournit un différentes métriques pour guider le choix du nombre optimal de topics. Les résultats peuvent être visualisés avec la fonction plot(kresult): 
+La fonction **searchK()** fournit un différentes métriques pour guider le choix du nombre optimal de topics. Les résultats peuvent être visualisés avec la fonction plot(kresult): 
 ```{r warning = FALSE, message = FALSE, eval = FALSE}
 
 set.seed(2025)
@@ -1028,7 +1043,7 @@ plot(kresult)
   * **lower bound**: la borne inférieure (lower bound) de la vraisemblance est utilisée pour suivre la convergence de l’algorithme d’estimation.
 
 <div class="alert alert-success" role="alert"> 
-Conseil : rien n'interdit de construire plusieurs modèles avec un nombre de topics différents et de comparer les résultats. Cela permet aussi de naviguer entre différents niveaux de granularité. Attention la construction des modèles peut prendre du temps selon la taille du corpus.</div>
+Conseil : rien n'interdit de construire plusieurs modèles avec un nombre de topics différents et de comparer les résultats. Cela permet aussi de naviguer entre différents niveaux de granularité. Attention, la construction des modèles peut prendre du temps selon la taille du corpus.</div>
 
 Ci-dessous, on propose de construire trois modèles avec 10, 20, et 40 topics:
 
@@ -1080,7 +1095,7 @@ source40 <- stm::estimateEffect(1:40 ~ Source, mod.40, meta=out$meta)
 ```
 
 <div class="alert alert-success" role="alert"> 
-A ce stade, il est conseillé de sauvegarder l'environnement sous forme d'un fichier image (.RData) pour éviter d'avoir à refaire tous les calculs si votre ordinateur crashe ou si vous devez reprendre votre travail plus tard. Ce fichier image sera également nécessaire si vous souhaitez utiliser l'interface stminsights introduite dans la section suivante.</div>
+A ce stade, il est conseillé de sauvegarder l'environnement sous forme d'un fichier image (.RData) pour éviter d'avoir à refaire tous les calculs si votre ordinateur crashe ou si vous devez reprendre votre travail plus tard. Ce fichier image sera également nécessaire si vous souhaitez utiliser l'interface **stminsights** introduite dans la section suivante.</div>
 
 ```{r warning = FALSE, message = FALSE, eval = FALSE}
 
@@ -1092,7 +1107,7 @@ save.image("mytopics.RData")
 
 ### Avec l'interface stminsights
 
-Dans un premier temps, il est conseillé d'utiliser le package **stminsights** qui fournit une interface agréable pour faciliter l'exploration des topics obtenus et comparer les différences modèles construits. Après avoir ouvert l'application, chargez le fichier image (RData) qui contient votre modèle ou vos différents modèles.
+Dans un premier temps, il est conseillé d'utiliser le package **stminsights** qui fournit une interface agréable pour faciliter l'exploration des topics obtenus et comparer les différences modèles construits. Après avoir ouvert l'application, chargez le fichier .RData qui contient votre ou vos modèles. 
 ```{r warning = FALSE, message = FALSE, eval = FALSE}
 
 library(stminsights)
@@ -1147,7 +1162,7 @@ cloud(mod.20, topic = 3)
 <br>
 Pour modifier la taille du nuage et juxtaposer deux nuages, vous pouvez utiliser le code suivant (modifiez les marges et l'échelle à votre guise) : 
 
-```{r}
+```{r warning = FALSE, message = FALSE}
 par(mfrow=c(1,2), mar=c(0,0,2,2))
 cloud(mod.20, topic = 3, scale = c(4, 0.4))
 cloud(mod.20, topic = 10, scale = c(4, 0.4))
@@ -1211,7 +1226,7 @@ td_beta10_top_words %>% arrange(topic, desc(beta))
 
 ### LDAvis
 
-Le package **`stm`** propose une fonction appelée **`LDAvis`**, qui permet de générer une **visualisation interactive** d’un modèle de topics, inspirée des méthodes de la Latent Dirichlet Allocation (LDA). Cet outil est particulièrement utile pour **explorer et interpréter visuellement les topics** extraits du corpus.
+Le package **`stm`** propose une fonction appelée **`LDAvis`**, qui permet de générer une **visualisation interactive** d’un modèle de topics, inspirée des méthodes de la Latent Dirichlet Allocation (LDA). Cet outil est particulièrement utile pour **explorer et interpréter visuellement les topics** extraits du corpus. Attention : la numérotation des topics ne correspond pas à ceux obtenus avec stm! 
 
 ```{r warning = FALSE, message = FALSE, eval = FALSE}
 
@@ -1223,7 +1238,7 @@ stm::toLDAvis(mod.40, doc=out$documents)
 <br>
 La visualisation se compose de deux panneaux principaux :
 
-  * À gauche : la carte des topics: Chaque cercle représente un topic. Le **nombre total de cercles (K) correspond au nombre de topics extraits. La taille de chaque cercle est proportionnelle à l’importance relative du topic dans l’ensemble du corpus (c’est-à-dire la part de tokens qu’il couvre). La **distance entre les cercles** reflète la similarité entre topics. Des cercles proches indiquent des topics partageant un vocabulaire similaire. Des cercles éloignés suggèrent des topics plus distincts.
+  * À gauche : la carte des topics: Chaque cercle représente un topic. Le nombre total de cercles (K) correspond au nombre de topics extraits. La taille de chaque cercle est proportionnelle à l’importance relative du topic dans l’ensemble du corpus (c’est-à-dire la part de tokens qu’il couvre). La distance entre les cercles reflète la similarité entre topics. Des cercles proches indiquent des topics partageant un vocabulaire similaire. Des cercles éloignés suggèrent des topics plus distincts.
   * À droite : le nuage de mots associé à un topic sélectionné: Lorsque vous cliquez sur un cercle (ou utilisez le curseur pour en sélectionner un), un **histogramme s’affiche** pour montrer les mots caractéristiques de ce topic. Pour chaque terme, deux barres sont affichées : Une **barre bleue**, qui indique la **fréquence globale** du mot dans le corpus. Une **barre rouge**, qui représente la **fréquence estimée** du mot **au sein du topic sélectionné**. Cela permet d’identifier les mots **distinctifs**, c’est-à-dire ceux qui sont fréquents dans un topic mais peu courants dans le corpus global.
 
 Par ailleurs, un **curseur** permet d’ajuster le poids donné à la fréquence globale vs. la spécificité des mots pour trier la liste (appelée *relevance*). Vers la gauche (λ proche de 0), les mots sont très spécifiques au topic. Vers la droite (λ proche de 1), on privilégie les mots les plus fréquents dans le topic, même s’ils apparaissent ailleurs.
@@ -1236,7 +1251,7 @@ En résumé, **LDAvis** permet d’explorer interactivement :
 
 ### Corrélations
 
-La fonction permet de visualiser sous formes de graphes les chevauchement entre topics à partir des termes qu'ils partagent. Deux méthodes de calcul sont proposées, simple ou complexe (huge) (pour plus de détails sur ces mesures, voir la documentation du package [**stm**](https://www.structuraltopicmodel.com/).
+La fonction **topicCorr** permet de visualiser sous formes de graphes les chevauchement entre topics à partir des termes qu'ils partagent. Deux méthodes de calcul sont proposées, simple ou complexe (huge) (pour plus de détails sur ces mesures, voir la documentation du package [**stm**](https://www.structuraltopicmodel.com/).
 
 Exemple avec le modèle à 20 topics: 
 ```{r warning = FALSE, message = FALSE}
@@ -1523,7 +1538,7 @@ ggplot(sentiment_year, aes(Year, average)) +
        caption = "Based on 'bing' lexicon")
 
 ```
-<br>
+
 ## Comparaison  
 
 Comparons différents lexiques 
@@ -1574,7 +1589,7 @@ bind_rows(afinn,
 <div class="alert alert-danger" role="alert">   
 **Important à retenir**
 
-L'application de l'analyse de sentiment dans le domaine des SHS soulève des questions spécifiques : la variabilité historique du langage, les biais culturels et temporels dans les corpus, la nécessité d'une validation par expertise disciplinaire, et l'importance de maintenir une approche critique face aux résultats quantitatifs. Par exemple, les historiens qui utilisent ces outils pour traiter de grands corpus d'archives numérisées soulignent l'importance de croiser ces analyses avec les méthodes traditionnelles de la discipline (lecture rapprochée des archives, contextualisation, critique herméneutique). De même pour les sociologues qui l'appliquent à l'analyse des médias sociaux de type Facebook ou X, par exemple, qui insistent sur l'importance de croiser avec des entretiens, observations de terrain et autres sources extérieures.</div> 
+L'application de l'analyse de sentiment dans le domaine des SHS soulève des difficultés spécifiques : la variabilité historique du langage, les biais culturels et temporels dans les corpus, la nécessité d'une validation par expertise disciplinaire, et l'importance de maintenir une approche critique face aux résultats quantitatifs. Par exemple, les historiens qui utilisent ces outils pour traiter de grands corpus d'archives numérisées soulignent l'importance de croiser ces analyses avec les méthodes traditionnelles de la discipline (lecture rapprochée des archives, contextualisation, critique herméneutique). De même pour les sociologues qui l'appliquent à l'analyse des médias sociaux de type Facebook ou X, par exemple, qui insistent sur l'importance de croiser avec des entretiens, observations de terrain et autres sources extérieures.</div> 
 
 ## Quizz
 
@@ -1587,7 +1602,7 @@ L'application de l'analyse de sentiment dans le domaine des SHS soulève des que
 
 La reconnaissance d'entitées nommées est une tâche bien établie en traitement automatique des langues qui consiste à détecter dans un corpus tous les noms de personnes, organisations, lieux, événements (et autres entitées selon les ontologies utilisées lors de l'entraînement).
 
-Différentes modèles et packages sont disponibles (voir l'aide-mémoire pour une liste détaillée). Dans cette séance, nous proposons d'utiliser les modèles fournis par le package **histtext** basés sur l'ontologie [Ontonote](https://catalog.ldc.upenn.edu/LDC2013T19).
+Différentes modèles et packages sont disponibles (voir l'aide-mémoire pour une liste détaillée). Dans cette séance, nous proposons d'utiliser les modèles fournis par le package **histtext** basés sur l'ontologie [OntoNotes](https://catalog.ldc.upenn.edu/LDC2013T19).
 
 ## Extraire et filtrer
 
@@ -1601,7 +1616,7 @@ lyon_ner <- ner_on_corpus(lyon_corpus, "proquest", only_precomputed = TRUE)
 
 ```
 
-<div class="alert alert-danger" role="alert"> 
+<div class="alert alert-success" role="alert"> 
 **A retenir**
 
   * L'opération peut prendre du temps et exiger une grosse capacité de calcul. Pour les très gros corpus (plusieurs milliers de documents), il est conseillé de diviser le corpus en échantillons de plus petite taille. 
@@ -1628,11 +1643,11 @@ lyon_org <- lyon_ner %>% filter(Type == "ORG")
  
 ## Normaliser et compter
 
-Un simple coup d’œil suffit pour constater que la liste d’entités extraites contient de nombreuses erreurs. Ces incohérences peuvent s'expliquer par plusieurs facteurs : la qualité variable des sources, les fluctuations historiques dans les usages orthographiques, les limitations de l’OCR, ou encore les imprécisions du modèle de reconnaissance d'entités nommées (NER). L’extraction d’information, notamment lorsqu’elle repose sur des entités, exige donc un travail préalable de nettoyage et de normalisation. Celui-ci est essentiel pour éviter des biais dans les analyses, qu’il s’agisse de mesurer la fréquence des entités, d’identifier les plus significatives ou de cartographier leurs relations via un réseau de cooccurrences.
+Un simple coup d’œil suffit pour constater que la liste d’entités extraites contient de nombreuses erreurs ou des incohérences. Celles-ci peuvent s'expliquer par plusieurs facteurs : la qualité variable des documents d'origine, les fluctuations historiques dans les usages orthographiques, les limitations dans la reconnaissance optique de caractères (OCR), ou encore les imprécisions du modèle de reconnaissance d'entités nommées (NER). L’extraction d’information, notamment lorsqu’elle repose sur des entités, exige donc un travail préalable de nettoyage et de normalisation. Celui-ci est essentiel pour éviter des biais dans les analyses, qu’il s’agisse de mesurer la fréquence des entités, d’identifier les plus significatives ou de cartographier leurs relations via un réseau de cooccurrences. 
 
 La première étape consiste à passer en revue les entités extraites pour repérer les anomalies et définir une stratégie de correction.
 
-Sur des jeux de données volumineux (plusieurs dizaines de milliers d’entités), la perfection est illusoire. Toutefois, des outils comme le package R **stringR** permettent d’automatiser une grande partie des opérations de nettoyage, souvent fastidieuses dans des logiciels comme Excel, tout en assurant la traçabilité des modifications. Nous proposons ici quelques méthodes simples et efficaces pour réduire le bruit de manière automatisée et transparente.
+Sur des jeux de données volumineux (plusieurs dizaines de milliers d’entités), la perfection est illusoire. Toutefois, des outils comme le package **stringR** permettent d’automatiser une grande partie des opérations de nettoyage, souvent fastidieuses dans des logiciels comme Excel, tout en assurant la traçabilité des modifications. Nous proposons ici quelques méthodes simples et efficaces pour réduire le bruit de manière automatisée et transparente.
 
 Prenons l'exemple des entités organisations. 
 
