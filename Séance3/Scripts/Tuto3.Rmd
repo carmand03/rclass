@@ -32,7 +32,7 @@ library(kableExtra)
 
 ```{r message = FALSE, warning = FALSE, echo=FALSE}
 
-load("~/RClass/Cours3/Cours3.RData")
+load("~/Desktop/IntroR/Data/Cours3.RData")
 
 ```
 
@@ -337,8 +337,8 @@ page_rank(g1)$vector
 **Remarques importantes**
 
   1. Pour les graphes orientés, plusieurs fonctions prennent **mode = "in"**, **"out"** ou **"all"**.
-  2. Certaines mesures sont sensibles aux composantes connexes : si le graphe est non connexe, les mesures de **betweeneness()** et **closeness()** peuvent retourner des valeurs biaisées.</div>
-  3. Certaines mesures comme **hub/authority** ne s'appliquent que dans les réseaux orientés.
+  2. Certaines mesures sont sensibles aux composantes connexes : si le graphe est non connexe, les mesures de **betweeneness()** et **closeness()** peuvent retourner des valeurs biaisées.
+  3. Certaines mesures comme **hub/authority** ne s'appliquent que dans les réseaux orientés.</div>
 
 
 Pour combiner ces différentes mesures dans un seul dataframe et les exporter au format csv, on peut appliquer le code suivant : 
